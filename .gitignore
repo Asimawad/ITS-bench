@@ -3,7 +3,7 @@ mlebench/competitions/**/kernels/
 outputs/
 /data/
 /data_privateonly/
-
+asim-vi
 runs/*/*/
 runs/*/metadata.json
 
