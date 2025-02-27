@@ -3,10 +3,9 @@ mlebench/competitions/**/kernels/
 outputs/
 /data/
 /data_privateonly/
-asim-vi
 runs/*/*/
 runs/*/metadata.json
-stuff/
+stuff
 # Re-include metadata.json, dolos, and grading reports
 !runs/*/dolos
 !runs/**/*_grading_report.json
