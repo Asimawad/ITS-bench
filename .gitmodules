@@ -1,0 +1,3 @@
+[submodule "aide-ds"]
+	path = aide-ds
+	url = https://github.com/Asimawad/aide-ds.git
