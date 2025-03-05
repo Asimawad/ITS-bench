@@ -1,1 +1,2 @@
--e ./aideml
+# -e /app/aide-ds
+git+https://github.com/Asimawad/aide-ds

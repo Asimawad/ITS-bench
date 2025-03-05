@@ -20,6 +20,7 @@ ARG REQUIREMENTS=${AGENT_DIR}/requirements.txt
 
 # copy just the requirements file, so that we can cache conda separately from the agent files
 COPY requirements.txt ${AGENT_DIR}/requirements.txt
+# COPY aide-ds /app/aide-ds
 
 # Requirements for opencv
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
