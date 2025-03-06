@@ -3,6 +3,6 @@
     "shm_size": "4G",
     "nano_cpus": 4e9,
     "runtime": "sysbox-runc",
-    "gpus": -1
+    "gpus":0   
 
 }

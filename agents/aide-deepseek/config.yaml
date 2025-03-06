@@ -21,8 +21,8 @@ aide:
   <<: *defaults
   kwargs:
     <<: *kwargs_common
-    agent.code.model: gpt-4o-2024-08-06
-    agent.feedback.model: gpt-4o-2024-08-06
+    agent.code.model: deepseek-r1:14b
+    agent.feedback.model: o3-mini
     agent.steps: *step_count
   env_vars:
     <<: *env_vars
