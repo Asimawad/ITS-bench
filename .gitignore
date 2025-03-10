@@ -11,7 +11,7 @@ stuff/
 !runs/*/dolos
 !runs/**/*_grading_report.json
 !runs/**/grading_report_*.json
-
+mlebench-env.tar
 cache/
 # MLE-bench [END]
 ./aide-ds/

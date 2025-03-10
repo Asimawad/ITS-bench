@@ -21,7 +21,7 @@ aide:
   <<: *defaults
   kwargs:
     <<: *kwargs_common
-    agent.code.model: deepseek-r1:14b
+    agent.code.model: deepseek-r1:7b
     agent.feedback.model: o3-mini
     agent.steps: *step_count
   env_vars:

@@ -147,6 +147,7 @@ def create_competition_container(
         detach=True,
         **parse_container_config(container_config),
         volumes=volumes_config,
+        network_mode="host",
         environment=env_vars,
         privileged=privileged,
     )
