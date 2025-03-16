@@ -144,4 +144,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-sysbox-ce_0.6.6-0.linux_amd64.deb
+sysbox-ce_0.6.6-0.linux_amd64.debchosen_dataset.csv
+tests.py
