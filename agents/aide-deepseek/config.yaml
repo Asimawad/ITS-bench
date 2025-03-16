@@ -1,6 +1,6 @@
 vars:
   step_count: &step_count 500
-  time_limit: &time_limit 3600 # 24 hrs
+  time_limit: &time_limit 3600 # 9 h # 24 hrs
 
 defaults: &defaults
   start: aide-deepseek/start.sh
@@ -14,14 +14,14 @@ kwargs_common: &kwargs_common
   agent.search.max_debug_depth: 20 # debug down a branch for up to 20 steps
   agent.search.debug_prob: 1 # always debug when there's something to debug
   agent.time_limit: *time_limit
-  exec.timeout: 3600 # 9 hours limit _per step_, to match max of kaggle.com
+  exec.timeout: 3600 # 2 h# 9 hours limit _per step_, to match max of kaggle.com
   copy_data: False # use symbolic links
 
 aide:
   <<: *defaults
   kwargs:
     <<: *kwargs_common
-    agent.code.model: deepseek-r1:14b
+    agent.code.model: o3-mini #deepseek-r1:14b
     agent.feedback.model: o3-mini
     agent.steps: *step_count
   env_vars:

@@ -2,6 +2,10 @@ import argparse
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from templates import additional_notes_template, config_template
 from utils import get_gpu_generation
 
