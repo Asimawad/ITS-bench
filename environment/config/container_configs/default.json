@@ -3,6 +3,6 @@
     "shm_size": "4G",
     "nano_cpus": 4e9,
     "runtime": "runc",
-    "gpus":0   
+    "gpus":-1   
 
 }

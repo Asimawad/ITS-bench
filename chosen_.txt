@@ -1,3 +1,4 @@
-aerial-cactus-identification
-
-
+text-normalization-challenge-english-language
+text-normalization-challenge-russian-language
+spooky-author-identification
+random-acts-of-pizza
