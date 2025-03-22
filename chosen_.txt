@@ -1,4 +1,6 @@
-text-normalization-challenge-english-language
-text-normalization-challenge-russian-language
-spooky-author-identification
-random-acts-of-pizza
+dog-breed-identification
+dogs-vs-cats-redux-kernels-edition
+jigsaw-toxic-comment-classification-challenge
+leaf-classification
+mlsp-2013-birds
+

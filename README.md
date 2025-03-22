@@ -145,7 +145,6 @@ Build this image by running:
 ```bash
 docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile .
 ```
-
 ## Agents
 
 We purposefully designed our benchmark to not make any assumptions about the agent that produces submissions, so agents can more easily be evaluated on this benchmark. We evaluated three open-source agents; we discuss this procedure in [agents/README.md](agents/README.md).
