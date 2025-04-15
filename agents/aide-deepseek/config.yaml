@@ -141,3 +141,14 @@ aide/obfuscated:
     <<: *env_vars
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     OBFUSCATE: "true"
+
+aide-deepseek2:
+  <<: *defaults
+  kwargs:
+    <<: *kwargs_common
+    agent.code.model: deepseek-r1:latest
+    agent.feedback.model: o3-mini
+    agent.steps: *step_count
+  env_vars:
+    <<: *env_vars
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
