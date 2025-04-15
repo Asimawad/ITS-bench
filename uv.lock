@@ -1526,7 +1526,7 @@ requires-dist = [
     { name = "fastparquet", specifier = ">=2024.5.0" },
     { name = "ipython", specifier = ">=8.26.0" },
     { name = "isort", marker = "extra == 'formatters'", specifier = ">=5.13" },
-    { name = "kaggle", specifier = ">=1.6" },
+    { name = "kaggle", specifier = ">=1.6,<1.7" },
     { name = "levenshtein", specifier = ">=0.25.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "nbconvert", specifier = ">=7.16.4" },

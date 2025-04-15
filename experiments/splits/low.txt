@@ -1,2 +1,3 @@
+aerial-cactus-identification
+text-normalization-challenge-english-language
 text-normalization-challenge-russian-language
-jigsaw-toxic-comment-classification-challenge
