@@ -784,6 +784,15 @@ wheels = [
 ]
 
 [[package]]
+name = "git-lfs"
+version = "1.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/dc/185ee56393de691e467465163476303c6c900891ff0d1012fc60c92c2344/git-lfs-1.6.tar.gz", hash = "sha256:93a5e8a2bf71d66a9a5bae0d28c8137dd40c108dc3e1031fa6d30511794fae3a", size = 6435 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/40/cd243be7ba9bd9d83fd8515b1aed7e0b822c76cab4bf60398a1b7e024f00/git_lfs-1.6-py2.py3-none-any.whl", hash = "sha256:2fecacaefc93ab278933b7755d4a48972f0deca7f9ff27439594ad835decf8ed", size = 5616 },
+]
+
+[[package]]
 name = "google-pasta"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1484,6 +1493,7 @@ dependencies = [
     { name = "diskcache" },
     { name = "docker" },
     { name = "fastparquet" },
+    { name = "git-lfs" },
     { name = "ipython" },
     { name = "kaggle" },
     { name = "levenshtein" },
@@ -1524,6 +1534,7 @@ requires-dist = [
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "docker", specifier = ">=7.1" },
     { name = "fastparquet", specifier = ">=2024.5.0" },
+    { name = "git-lfs" },
     { name = "ipython", specifier = ">=8.26.0" },
     { name = "isort", marker = "extra == 'formatters'", specifier = ">=5.13" },
     { name = "kaggle", specifier = ">=1.6,<1.7" },
