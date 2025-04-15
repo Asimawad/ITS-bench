@@ -1,5 +1,5 @@
 aerial-cactus-identification 
-denoising-dirty-documents 
+text-normalization-challenge-english-language
 text-normalization-challenge-russian-language
-random-acts-of-pizza 
-jigsaw-toxic-comment-classification-challenge
+spooky-author-identification
+random-acts-of-pizza
