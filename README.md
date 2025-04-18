@@ -20,7 +20,7 @@ sudo apt upgrade -y
 
 curl -fsSL https://get.docker.com | sudo sh
 
-add yourself to the group 
+**add yourself to the group **
 sudo usermod -aG docker $USER
 
 

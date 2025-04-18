@@ -151,3 +151,4 @@ sysbox-ce_0.6.6-0.linux_amd64.debchosen_dataset.csv
 tests.py
 .env
 .qodo
+Datasets/
