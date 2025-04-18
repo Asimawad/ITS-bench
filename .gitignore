@@ -19,6 +19,8 @@ cache/
 __pycache__/
 *.py[cod]
 *$py.class
+# .gitignore
+*.pyc
 
 # C extensions
 *.so

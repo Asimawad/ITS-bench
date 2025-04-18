@@ -1,3 +1,37 @@
+# Getting started
+1. Get uv 
+
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+2. get python 3.11.11
+
+3. create a virtual environment
+
+uv venv --python python3.11.11 .venv
+source .venv/bin/activate
+
+then simply 
+
+uv sync --active
+
+4. set docker
+sudo apt update
+sudo apt upgrade -y
+
+curl -fsSL https://get.docker.com | sudo sh
+
+add yourself to the group 
+sudo usermod -aG docker $USER
+
+
+
+
+
+
+
+
+
+
 # MLE-bench
 
 Code for the paper ["MLE-Bench: Evaluating Machine Learning Agents on Machine Learning Engineering"](https://arxiv.org/abs/2410.07095). We have released the code used to construct the dataset, the evaluation logic, as well as the agents we evaluated for this benchmark.
@@ -145,7 +179,6 @@ Build this image by running:
 ```bash
 docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile .
 ```
-
 ## Agents
 
 We purposefully designed our benchmark to not make any assumptions about the agent that produces submissions, so agents can more easily be evaluated on this benchmark. We evaluated three open-source agents; we discuss this procedure in [agents/README.md](agents/README.md).
