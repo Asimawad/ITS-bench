@@ -34,7 +34,7 @@ docker build --platform=linux/amd64 -t aide-deepseek agents/aide-deepseek/ --bui
 
 Our `run_agent.py` script allows you to run agents locally on a given set of competitions. In the `experiments/splits/` directory, we have several files, each containing a set of competition IDs. The `experiments/splits/all.txt` file contains all competitions. The `experiments/splits/spaceship-titanic.txt` split just contains the Spaceship Titanic competition, which is useful for testing. For example, to run the dummy agent on the Spaceship Titanic competition, you can run:
 
-```console
+```bash 
 python run_agent.py --agent-id aide --competition-set experiments/splits/chosen_competetions.txt --data-dir Dataset
 ```
 
