@@ -20,7 +20,7 @@ sudo apt upgrade -y
 
 curl -fsSL https://get.docker.com | sudo sh
 
-**add yourself to the group **
+add yourself to the group 
 sudo usermod -aG docker $USER
 
 
@@ -130,20 +130,20 @@ raw datasets. Ensure that you have downloaded your Kaggle credentials
 location where the Kaggle API looks for your credentials). To download and prepare the MLE-bench dataset, run the following, which will download and prepare the dataset in your system's default cache directory. Note, we've found this to take two days when running from scratch:
 
 ```console
-mlebench prepare --all
+mlebench prepare --all --data-dir all_datasets
 ```
 
 To prepare the lite dataset, run:
 
 ```console
-mlebench prepare --lite
+mlebench prepare --lite --data-dir lite_dataset
 ```
 
 Alternatively, you can prepare the dataset for a specific competition by
 running:
 
 ```console
-mlebench prepare -c <competition-id>
+mlebench prepare -c <competition-id> --data-dir .
 ```
 
 Run `mlebench prepare --help` to see the list of available competitions.
@@ -167,6 +167,9 @@ mlebench grade-sample <PATH_TO_SUBMISSION> spaceship-titanic
 
 See more information by running `mlebench grade-sample --help`.
 
+```bash
+mlebench grade-sample --data-dir  submission   --output-dir  competition_id
+```
 ## Environment
 
 We provide a base Docker image `mlebench-env` which is the base environment for our agents. This base image contains:

@@ -7,6 +7,7 @@ asim-vi
 runs/*/*/
 runs/*/metadata.json
 stuff/
+agents/aide-deepseek-coder/
 # Re-include metadata.json, dolos, and grading reports
 !runs/*/dolos
 !runs/**/*_grading_report.json
@@ -21,10 +22,10 @@ __pycache__/
 *$py.class
 # .gitignore
 *.pyc
-
+lite_dataset/
 # C extensions
 *.so
-lite_dataset/
+
 # Distribution / packaging
 .Python
 build/
@@ -151,4 +152,3 @@ sysbox-ce_0.6.6-0.linux_amd64.debchosen_dataset.csv
 tests.py
 .env
 .qodo
-Datasets/

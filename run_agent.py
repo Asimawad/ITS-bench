@@ -89,7 +89,6 @@ async def worker(
 
 
 async def main(args):
-    os.environ.setdefault("I_ACCEPT_RUNNING_PRIVILEGED_CONTAINERS", "True")
     client = docker.from_env()
     global registry
     registry = registry.set_data_dir(Path(args.data_dir))
