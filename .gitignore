@@ -21,7 +21,7 @@ __pycache__/
 *$py.class
 # .gitignore
 *.pyc
-
+lite_dataset/
 # C extensions
 *.so
 

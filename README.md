@@ -167,6 +167,9 @@ mlebench grade-sample <PATH_TO_SUBMISSION> spaceship-titanic
 
 See more information by running `mlebench grade-sample --help`.
 
+```bash
+mlebench grade-sample --data-dir  submission   --output-dir  competition_id
+```
 ## Environment
 
 We provide a base Docker image `mlebench-env` which is the base environment for our agents. This base image contains:

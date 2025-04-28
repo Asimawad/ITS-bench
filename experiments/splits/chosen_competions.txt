@@ -1,10 +1,1 @@
-aerial-cactus-identification
-spooky-author-identification
-denoising-dirty-documents
-dogs-vs-cats-redux-kernels-edition
-nomad2018-predict-transparent-conductors
 random-acts-of-pizza
-text-normalization-challenge-english-language
-text-normalization-challenge-russian-language
-jigsaw-toxic-comment-classification-challenge
-leaf-classification
