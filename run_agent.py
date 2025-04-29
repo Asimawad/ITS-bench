@@ -9,11 +9,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import docker
+from agents.run import run as backend_run  # single entrypoint now
+
+MBX_NO_DOCKER = os.getenv("MBX_NO_DOCKER", "0") == "1"
+if not MBX_NO_DOCKER:
+    import docker
 
 from agents.registry import Agent
 from agents.registry import registry as agent_registry
-from agents.run import run_in_container
+from agents.run import run_in_container, run_locally
 from environment.defaults import DEFAULT_CONTAINER_CONFIG_PATH
 from mlebench.data import is_dataset_prepared
 from mlebench.registry import Competition, registry
@@ -22,24 +26,29 @@ from mlebench.utils import create_run_dir, get_logger, get_runs_dir, get_timesta
 logger = get_logger(__name__)
 
 
+# @dataclass(frozen=True)
+# class Task:
+#     run_id: str
+#     seed: int
+#     image: str                 # need editing
+#     path_to_run_group: Path
+#     path_to_run: Path
+#     agent: Agent
+#     competition: Competition
+#     container_config: dict[str, Any]        # needs config
+
+
 @dataclass(frozen=True)
 class Task:
     run_id: str
     seed: int
-    image: str
     path_to_run_group: Path
     path_to_run: Path
     agent: Agent
     competition: Competition
-    container_config: dict[str, Any]
 
 
-async def worker(
-    idx: int,
-    queue: asyncio.Queue[Task],
-    client: docker.DockerClient,
-    tasks_outputs: dict[str, dict[str, Any]],
-) -> None:
+async def worker(idx, queue, client, backend_fn, tasks_outputs) -> None:
     while True:
         task = await queue.get()
 
@@ -57,18 +66,20 @@ async def worker(
         )
 
         task_output = {}
+
         try:
             await asyncio.to_thread(
-                run_in_container,
+                backend_run,
                 client=client,
                 competition=task.competition,
                 agent=task.agent,
                 image=task.agent.name,
-                container_config=task.container_config,
+                container_config=args.container_config,
                 retain_container=args.retain,
                 run_dir=task.path_to_run,
                 logger=run_logger,
             )
+
             task_output["success"] = True
 
             run_logger.info(
@@ -89,7 +100,12 @@ async def worker(
 
 
 async def main(args):
-    client = docker.from_env()
+    if MBX_NO_DOCKER:
+        client = None
+        backend_fn = run_locally
+    else:
+        client = docker.from_env()
+        backend_fn = run_in_container
     global registry
     registry = registry.set_data_dir(Path(args.data_dir))
 
@@ -116,8 +132,8 @@ async def main(args):
                 f"Please run `mlebench prepare -c {competition.id}` to prepare the dataset."
             )
 
-    with open(args.container_config, "r") as f:
-        container_config = json.load(f)
+    # with open(args.container_config, "r") as f:
+    #     container_config = json.load(f)
 
     # Create tasks for each (competition * seed)
     logger.info(f"Launching run group: {run_group}")
@@ -130,12 +146,12 @@ async def main(args):
             task = Task(
                 run_id=run_id,
                 seed=seed,
-                image=agent.name,
+                # image=agent.name,
                 agent=agent,
                 competition=competition,
                 path_to_run_group=run_dir.parent,
                 path_to_run=run_dir,
-                container_config=container_config,
+                # container_config=container_config,
             )
             tasks.append(task)
 
@@ -148,8 +164,7 @@ async def main(args):
     workers = []
     tasks_outputs = {}
     for idx in range(args.n_workers):
-        w = asyncio.create_task(worker(idx, queue, client, tasks_outputs))
-        workers.append(w)
+        w = asyncio.create_task(worker(idx, queue, client, backend_fn, tasks_outputs))
 
     # Wait for all tasks to be completed and collect results
     started_at = time.monotonic()

@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from docker.models.containers import Container
 from dotenv import dotenv_values
 
 from agents.registry import Agent
+from agents.run_local import run_locally
 from environment.utils import (
     create_competition_container,
     extract_from_container,
@@ -84,8 +86,8 @@ def clean_up(container: Container, logger: logging.Logger, retain: bool = False)
         return False
 
 
-def run_in_container(
-    client: docker.DockerClient,
+def run(
+    client: docker.DockerClient | None,
     competition: Competition,
     agent: Agent,
     image: str,
@@ -110,6 +112,9 @@ def run_in_container(
     Returns:
         Path to the output file.
     """
+
+    if os.getenv("MBX_NO_DOCKER", "0") == "1":
+        return run_locally(competition, agent, run_dir, logger)
     volumes_config = {
         competition.public_dir.resolve().as_posix(): {
             "bind": "/home/data",
