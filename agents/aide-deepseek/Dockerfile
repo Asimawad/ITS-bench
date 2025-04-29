@@ -29,9 +29,9 @@ RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 RUN conda run -n ${CONDA_ENV_NAME} pip install -r ${AGENT_DIR}/requirements.txt && \
     conda clean -afy
 # Copy local aide-ds into container
-COPY aide-ds ${AGENT_DIR}/aide-ds
+# COPY aide-ds ${AGENT_DIR}/aide-ds
 
 # Install aide-ds in editable mode
-RUN conda run -n ${CONDA_ENV_NAME} pip install -e ${AGENT_DIR}/aide-ds
+# RUN conda run -n ${CONDA_ENV_NAME} pip install -e ${AGENT_DIR}/aide-ds
 # put all the agent files in the expected location
 COPY . ${AGENT_DIR}

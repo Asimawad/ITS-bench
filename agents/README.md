@@ -1,14 +1,5 @@
 # Agents
 
-We evaluated three open-source agents. We slightly modified each agent to elicit better capabilities. We also developed a "dummy" agent, used to check that the environment is configured correctly. Each agent, alongside the link to our fork, is listed below. Each agent has an associated ID which we use to identify it within our repo.
-
-Agent | ID | Fork
-:-----:|:-----:|:-----:
-dummy | dummy | N/A
-[AIDE](https://www.weco.ai/blog/technical-report) | aide | https://github.com/thesofakillers/aideml
-[MLAgentBench](https://openreview.net/forum?id=1Fs1LvjYQW) | mlagentbench | https://github.com/JunShern/MLAgentBench
-[OpenHands](https://arxiv.org/abs/2407.16741) | opendevin | https://github.com/thesofakillers/OpenHands
-
 ## Prerequisites
 If you want to run these agents locally:
 - Install [Docker](https://docs.docker.com/engine/install/)
@@ -23,7 +14,7 @@ export LOGS_DIR=/home/logs
 export CODE_DIR=/home/code
 export AGENT_DIR=/home/agent
 
-docker build --platform=linux/amd64 -t <agent> agents/<agent>/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
+docker build --platform=linux/amd64 -t aide agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
 ```
 ## build the new agent
 ```

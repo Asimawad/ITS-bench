@@ -23,19 +23,6 @@ curl -fsSL https://get.docker.com | sudo sh
 add yourself to the group 
 sudo usermod -aG docker $USER
 
-
-
-
-
-
-
-
-
-
-# MLE-bench
-
-Code for the paper ["MLE-Bench: Evaluating Machine Learning Agents on Machine Learning Engineering"](https://arxiv.org/abs/2410.07095). We have released the code used to construct the dataset, the evaluation logic, as well as the agents we evaluated for this benchmark.
-
 ## Benchmarking
 
 This section describes a canonical setup for comparing scores on MLE-bench. We recommend the following:
@@ -47,14 +34,6 @@ This section describes a canonical setup for comparing scores on MLE-bench. We r
 
 We demonstrate how this looks in practice by reporting the main results from [our paper (Table 2)](https://arxiv.org/abs/2410.07095) in the table below:
 
-| Agent | Low == Lite (%) | Medium (%) | High (%) | All (%) |
-|---------|--------|-----------|---------|----------|
-| AIDE o1-preview | 34.3 ± 2.4 | 8.8 ± 1.1 | 10.0 ± 1.9 | 16.9 ± 1.1 |
-| AIDE gpt-4o-2024-08-06 | 19.0 ± 1.3 | 3.2 ± 0.5 | 5.6 ± 1.0 | 8.6 ± 0.5 |
-| AIDE claude-3-5-sonnet-20240620 | 19.4 ± 4.9 | 2.6 ± 1.5 | 2.3 ± 2.3 | 7.5 ± 1.8 |
-| OpenHands gpt-4o-2024-08-06 | 11.5 ± 3.4 | 2.2 ± 1.3 | 1.9 ± 1.9 | 5.1 ± 1.3 |
-| AIDE llama-3.1-405b-instruct | 8.3 ± 2.6 | 1.2 ± 0.8 | 0.0 ± 0.0 | 3.1 ± 0.9 |
-| MLAB gpt-4o-2024-08-06 | 4.2 ± 1.5 | 0.0 ± 0.0 | 0.0 ± 0.0 | 1.3 ± 0.5 |
 
 ### Lite Evaluation
 
@@ -115,15 +94,6 @@ pre-commit install
 
 ## Dataset
 
-The MLE-bench dataset is a collection of 75 Kaggle competitions which we use to evaluate the ML engineering capabilities of AI systems.
-
-Since Kaggle does not provide the held-out test set for each competition, we
-provide preparation scripts that split the publicly available training set into
-a new training and test set.
-
-For each competition, we also provide grading scripts that can be used to
-evaluate the score of a submission.
-
 We use the [Kaggle API](https://github.com/Kaggle/kaggle-api) to download the
 raw datasets. Ensure that you have downloaded your Kaggle credentials
 (`kaggle.json`) and placed it in the `~/.kaggle/` directory (this is the default
@@ -180,7 +150,7 @@ We provide a base Docker image `mlebench-env` which is the base environment for 
 Build this image by running:
 
 ```bash
-docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile .
+docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile . --build-arg INSTALL_HEAVY_DEPENDENCIES=false
 ```
 ## Agents
 
