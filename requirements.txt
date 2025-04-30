@@ -118,6 +118,9 @@ igraph==0.11.6
 imagecodecs==2024.6.1
 imageio==2.37.0
 imbalanced-learn==0.12.3
+flask>=2.3
+werkzeug>=2.3
+
 imgaug==0.4.0
 importlib-metadata==8.6.1
 importlib-resources==6.5.2

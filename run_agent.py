@@ -17,7 +17,8 @@ if not MBX_NO_DOCKER:
 
 from agents.registry import Agent
 from agents.registry import registry as agent_registry
-from agents.run import run_in_container, run_locally
+
+# from agents.run import run_in_container, run_locally
 from environment.defaults import DEFAULT_CONTAINER_CONFIG_PATH
 from mlebench.data import is_dataset_prepared
 from mlebench.registry import Competition, registry
@@ -48,7 +49,7 @@ class Task:
     competition: Competition
 
 
-async def worker(idx, queue, client, backend_fn, tasks_outputs) -> None:
+async def worker(idx, queue, client, tasks_outputs) -> None:
     while True:
         task = await queue.get()
 
@@ -102,10 +103,8 @@ async def worker(idx, queue, client, backend_fn, tasks_outputs) -> None:
 async def main(args):
     if MBX_NO_DOCKER:
         client = None
-        backend_fn = run_locally
     else:
         client = docker.from_env()
-        backend_fn = run_in_container
     global registry
     registry = registry.set_data_dir(Path(args.data_dir))
 
@@ -164,7 +163,7 @@ async def main(args):
     workers = []
     tasks_outputs = {}
     for idx in range(args.n_workers):
-        w = asyncio.create_task(worker(idx, queue, client, backend_fn, tasks_outputs))
+        w = asyncio.create_task(worker(idx, queue, client, tasks_outputs))
 
     # Wait for all tasks to be completed and collect results
     started_at = time.monotonic()

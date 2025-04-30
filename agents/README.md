@@ -1,5 +1,7 @@
 # Agents
 
+export MBX_NO_DOCKER=1
+
 ## Prerequisites
 If you want to run these agents locally:
 - Install [Docker](https://docs.docker.com/engine/install/)

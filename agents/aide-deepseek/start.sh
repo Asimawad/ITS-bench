@@ -1,10 +1,10 @@
 #!/bin/bash
 set -x # Print commands and their arguments as they are executed
 
-cd ${AGENT_DIR}
+cd ${HOME_DIR}
 
-eval "$(conda shell.bash hook)" # make conda available to the shell
-conda activate agent
+# eval "$(conda shell.bash hook)" # make conda available to the shell
+# conda activate agent
 
 # determine hardware available
 if command -v nvidia-smi &> /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader &> /dev/null; then
@@ -36,20 +36,22 @@ export TIME_LIMIT=$(format_time $TIME_LIMIT_SECS)
 
 # overwrite instructions.txt with instructions_obfuscated.txt if $OBFUSCATE is set
 if [ "$OBFUSCATE" = "true" ]; then
-  if [ ! -w /home/data/ ]; then
+  if [ ! -w /${HOME_DIR}/data/ ]; then
     echo "Obfuscation not implemented for read-only mounts"
     exit 1
   fi
   mv /home/instructions_obfuscated.txt /home/instructions.txt
 fi
-
+echo "________________"
+ls -a
+echo "__________s"
 # start a new file to store the full instructions, starting with general instructions
-cp /home/instructions.txt ${AGENT_DIR}/full_instructions.txt
-
+cp ${AGENT_DIR}/instructions.txt ${AGENT_DIR}/full_instructions.txt
+cat ${AGENT_DIR}/full_instructions.txt
 # Update instructions for agent-specific details: replace `/home/` paths to make paths relative
 # (since the agent will have its own copies of these files in its workspace).
 # e.g. /home/submission/submission.csv -> submission/submission.csv
-sed -i 's|/home/||g' ${AGENT_DIR}/full_instructions.txt
+sed -i 's|/'${HOME_DIR}'/||g' ${AGENT_DIR}/full_instructions.txt
 # we'll take care of moving things to home/submission/ ourselves
 
 # move on to agent-specific instructions, with a linebreak in between
@@ -61,30 +63,33 @@ printf "\nCOMPETITION INSTRUCTIONS\n------\n\n" >> ${AGENT_DIR}/full_instruction
 
 # overwrite description.md with description_obfuscated.md if $OBFUSCATE is set
 if [ "$OBFUSCATE" = "true" ]; then
-  if [ ! -w /home/data/ ]; then
+  if [ ! -w /${HOME_DIR}/data/ ]; then
     echo "Obfuscation not implemented for read-only mounts"
     exit 1
   fi
-  mv /home/data/description_obfuscated.md /home/data/description.md
+  mv ${HOME_DIR}/data/description_obfuscated.md ${HOME_DIR}/data/description.md
 fi
-cat /home/data/description.md >> ${AGENT_DIR}/full_instructions.txt
+cat ${HOME_DIR}/data/description.md >> ${AGENT_DIR}/full_instructions.txt
 
 # symbolic linking
 # agent will write to AGENT_DIR/workspaces/exp/ and AGENT_DIR/logs/exp
 # we will mirror the contents of these to CODE_DIR, LOGS_DIR, and SUBMISSION_DIR
 
 # these need to pre-exist for the symbolic links to work
-mkdir -p ${AGENT_DIR}/workspaces/exp
-mkdir -p ${AGENT_DIR}/logs
+mkdir -p ${HOME_DIR}/workspaces/exp
+mkdir -p ${HOME_DIR}/logs
 # symbolic linking
-ln -s ${LOGS_DIR} ${AGENT_DIR}/logs/exp
-ln -s ${CODE_DIR} ${AGENT_DIR}/workspaces/exp/best_solution
-ln -s ${SUBMISSION_DIR} ${AGENT_DIR}/workspaces/exp/best_submission
+ln -s ${LOGS_DIR} ${HOME_DIR}/logs/exp
+ln -s ${CODE_DIR} ${HOME_DIR}/workspaces/exp/best_solution
+ln -s ${SUBMISSION_DIR} ${HOME_DIR}/workspaces/exp/best_submission
 
-# run with timeout, and print if timeout occurs
-timeout $TIME_LIMIT_SECS aide data_dir="/home/data/" desc_file="${AGENT_DIR}/full_instructions.txt" \
+# # run with timeout, and print if timeout occurs
+timeout $TIME_LIMIT_SECS 
+aide data_dir="/${HOME_DIR}/data/" desc_file="${AGENT_DIR}/full_instructions.txt" \
+  agent.code.model="deepseek-r1:1.5b" \
   exp_name="exp" \
-  $@ # forward the bash arguments to aide
+  ${AIDE_EXTRA_FLAGS} "$@" # forward the bash arguments to aide
+
 if [ $? -eq 124 ]; then
   echo "Timed out after $TIME_LIMIT"
 fi
