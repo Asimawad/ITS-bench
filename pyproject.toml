@@ -33,6 +33,8 @@ dependencies = [
   "shapely>=2.0.5",
   "ruff>=0.9.10",
   "git-lfs",
+  "flask>=2.3",
+  "werkzeug>=2.3"
 ]
 
 [tool.setuptools]

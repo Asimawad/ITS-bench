@@ -271,10 +271,10 @@ python3 -m vllm.entrypoints.openai.api_server \
     --dtype bfloat16 \
     --device cuda \
     --gpu-memory-utilization 0.9 \
-    --max-model-len 8196 \
+    --max-model-len 13310 \
     --quantization gptq 
 
 
-    # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide 
+    # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide --n-workers 5 --n-seeds 3
     AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4
     "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"
