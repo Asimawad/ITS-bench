@@ -20,7 +20,7 @@ set -x
 
 # Start vLLM server in the background
 echo "Starting vLLM server..."
-/opt/conda/bin/python -m vllm.entrypoints.openai.api_server \
+python -m vllm.entrypoints.openai.api_server \
     --model deepseek-ai/DeepSeek-R1-Distill-Qwen-32B \
     --port 8000 \
     --dtype bfloat16 \
@@ -42,26 +42,3 @@ echo "Executing command: $@"
 
 # Execute the command passed to the container
 exec "$@"
-
-python -m vllm.entrypoints.openai.api_server \
-    --model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B \
-    --port 8000 \
-    --served-model-name deepseek-1.5b \
-    --dtype bfloat16 \
-    --device cuda \
-    --gpu-memory-utilization 0.9 \
-    --max-model-len 2048 \
-    --tensor-parallel-size 1 \
-    --pipeline-parallel-size 1 \
-    --quantization None \
-    --enforce-eager \
-    --max-seq-len-to-capture 4096 \
-    --disable-sliding-window \
-    --tokenizer auto \
-    --tokenizer-mode auto \
-    --trust-remote-code \
-    --disable-log-requests \
-    --disable-log-stats \
-    --enable-lora \
-    --max-loras 64 \
-    --max-lora-rank 16

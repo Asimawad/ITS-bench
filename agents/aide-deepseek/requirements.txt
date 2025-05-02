@@ -1,2 +1,0 @@
-git+https://github.com/Asimawad/aide-ds
-# -e /app/aide-ds

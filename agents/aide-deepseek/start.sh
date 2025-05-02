@@ -1,10 +1,12 @@
 #!/bin/bash
 set -x # Print commands and their arguments as they are executed
-
+pwd
+cd ../../../
+echo $(pwd)
+pwd
+source .venv/bin/activate
 cd ${HOME_DIR}
 
-# eval "$(conda shell.bash hook)" # make conda available to the shell
-# conda activate agent
 
 # determine hardware available
 if command -v nvidia-smi &> /dev/null && nvidia-smi --query-gpu=name --format=csv,noheader &> /dev/null; then
@@ -44,17 +46,15 @@ if [ "$OBFUSCATE" = "true" ]; then
 fi
 echo "________________"
 ls -a
-echo "__________s"
+echo "________________"
 # start a new file to store the full instructions, starting with general instructions
 cp ${AGENT_DIR}/instructions.txt ${AGENT_DIR}/full_instructions.txt
 cat ${AGENT_DIR}/full_instructions.txt
-# Update instructions for agent-specific details: replace `/home/` paths to make paths relative
-# (since the agent will have its own copies of these files in its workspace).
-# e.g. /home/submission/submission.csv -> submission/submission.csv
-sed -i 's|/'${HOME_DIR}'/||g' ${AGENT_DIR}/full_instructions.txt
-# we'll take care of moving things to home/submission/ ourselves
 
-# move on to agent-specific instructions, with a linebreak in between
+
+sed -i 's|/'${HOME_DIR}'/||g' ${AGENT_DIR}/full_instructions.txt
+
+
 # substitute env variables into additional_notes.txt and append result to full_instructions.txt
 echo "" >> ${AGENT_DIR}/full_instructions.txt
 envsubst < ${AGENT_DIR}/additional_notes.txt >> ${AGENT_DIR}/full_instructions.txt
@@ -71,25 +71,13 @@ if [ "$OBFUSCATE" = "true" ]; then
 fi
 cat ${HOME_DIR}/data/description.md >> ${AGENT_DIR}/full_instructions.txt
 
-# symbolic linking
-# agent will write to AGENT_DIR/workspaces/exp/ and AGENT_DIR/logs/exp
-# we will mirror the contents of these to CODE_DIR, LOGS_DIR, and SUBMISSION_DIR
 
-# these need to pre-exist for the symbolic links to work
-mkdir -p ${HOME_DIR}/workspaces/exp
-mkdir -p ${HOME_DIR}/logs
-# symbolic linking
-ln -s ${LOGS_DIR} ${HOME_DIR}/logs/exp
-ln -s ${CODE_DIR} ${HOME_DIR}/workspaces/exp/best_solution
-ln -s ${SUBMISSION_DIR} ${HOME_DIR}/workspaces/exp/best_submission
-
-# # run with timeout, and print if timeout occurs
-timeout $TIME_LIMIT_SECS 
-aide data_dir="/${HOME_DIR}/data/" desc_file="${AGENT_DIR}/full_instructions.txt" \
-  agent.code.model="deepseek-r1:1.5b" \
-  exp_name="exp" \
-  ${AIDE_EXTRA_FLAGS} "$@" # forward the bash arguments to aide
-
+timeout $TIME_LIMIT_SECS
+aide \
+  data_dir="${HOME_DIR}/data/" \
+  desc_file="${AGENT_DIR}/full_instructions.txt" \
+  agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" \
+  "$@" # forward the bash arguments to aide
 if [ $? -eq 124 ]; then
   echo "Timed out after $TIME_LIMIT"
 fi

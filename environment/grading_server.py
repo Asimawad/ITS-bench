@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -40,4 +41,14 @@ def health():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    parser = argparse.ArgumentParser(description="Grading server.")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5000,  # Default port if --port is not provided
+        help="Port to run the server on",
+    )
+
+    args = parser.parse_args()
+
+    app.run(host="0.0.0.0", port=args.port, debug=False)  # *** Ensure args.port is used here ***

@@ -21,42 +21,10 @@ aide:
   <<: *defaults
   kwargs:
     <<: *kwargs_common
-    agent.code.model: deepseek-r1:latest
+    agent.code.model: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B #deepseek-r1:latest
     agent.feedback.model: o3-mini
     agent.steps: *step_count
-  env_vars:
-    <<: *env_vars
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-aide/dev:
-  <<: *defaults
-  kwargs:
-    <<: *kwargs_common
-    agent.code.model: gpt-4o-2024-08-06
-    agent.feedback.model: gpt-4o-2024-08-06
-    agent.steps: 8
-  env_vars:
-    <<: *env_vars
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-aide/llama-3.1-405b-instruct:
-  <<: *defaults
-  kwargs:
-    <<: *kwargs_common
-    agent.code.model: meta-llama/llama-3.1-405b-instruct
-    agent.feedback.model: gpt-4o-2024-08-06
-    agent.steps: *step_count
-  env_vars:
-    <<: *env_vars
-    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-
-aide-deepseek2:
-  <<: *defaults
-  kwargs:
-    <<: *kwargs_common
-    agent.code.model: deepseek-r1:latest
-    agent.feedback.model: o3-mini
-    agent.steps: *step_count
+    # inference_engine: vllm
   env_vars:
     <<: *env_vars
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

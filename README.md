@@ -22,6 +22,71 @@ curl -fsSL https://get.docker.com | sudo sh
 
 add yourself to the group 
 sudo usermod -aG docker $USER
+## Agent
+# Agents
+
+export MBX_NO_DOCKER=1
+
+<!-- (ITS-bench) asim@omen:~/Desktop/ITS-bench$ docker run -it mlebench-env:latest /bin/bash
++ tee /entrypoint.log
++ LOGS_DIR=/home/logs
++ mkdir -p /home/logs
++ find /home -path /home/data -prune -o -exec chmod a+rw '{}' ';'
++ ls -l /home
+total 28
+-rw-rw-rw- 1 root    root    2789 Feb 25 18:26 instructions.txt
+-rw-rw-rw- 1 root    root    2586 Feb 25 18:26 instructions_obfuscated.txt
+drwxrwxrwx 2 root    root    4096 Apr 30 10:36 logs
+drwxrwxrwx 1 nonroot nonroot 4096 Mar  9 16:02 nonroot
+drwxrwxrwx 1 root    root    4096 Mar  9 16:02 submission
+-rw-rw-rw- 1 root    root     494 Feb 25 18:26 validate_submission.sh
++ /opt/conda/bin/python /private/grading_server.py
+ * Serving Flask app 'grading_server'
+ * Debug mode: off -->
+
+
+## Prerequisites
+If you want to run these agents locally:
+- Install [Docker](https://docs.docker.com/engine/install/)
+- Install [Sysbox](https://github.com/nestybox/sysbox). See [Security](#Security) below for more information
+- (Optional) Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) to run agents with GPUs
+
+To build an image for an agent with ID `<agent>`, run:
+
+```bash
+export SUBMISSION_DIR=/home/submission
+export LOGS_DIR=/home/logs
+export CODE_DIR=/home/code
+export AGENT_DIR=/home/agent
+
+docker build --platform=linux/amd64 -t aide agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
+```
+## build the new agent
+```
+docker build --platform=linux/amd64 -t aide-deepseek agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
+```
+
+## Running agents
+
+Our `run_agent.py` script allows you to run agents locally on a given set of competitions. In the `experiments/splits/` directory, we have several files, each containing a set of competition IDs. The `experiments/splits/all.txt` file contains all competitions. The `experiments/splits/spaceship-titanic.txt` split just contains the Spaceship Titanic competition, which is useful for testing. For example, to run the dummy agent on the Spaceship Titanic competition, you can run:
+
+```bash 
+python run_agent.py --agent-id aide --competition-set experiments/splits/chosen_competetions.txt --data-dir Dataset
+```
+
+Running `run_agent.py` will creates a "run group" directory in the `runs/` directory. The run group directory will contain a subdirectory for each competition that the agent was evaluated on, containing the agent's logs, code, and submission. A `metadata.json` file will be created on finish within the run group directory, summarizing the results of the runs. You can then grade this run using the `metadata.json` file. For example, to grade the run group `<run-group>`, you can first use `experiments/make_submission.py` to generate a submission JSONL file:
+
+```bash
+python experiments/make_submission.py --metadata runs/<run-group>/metadata.json --output runs/<run-group>/submission.jsonl
+```
+
+You can then use the `mlebench grade` command to grade this submission:
+
+```bash
+mlebench grade --submission runs/<run-group>/submission.jsonl --output-dir runs/<run-group>
+```
+
+If you'd like to update the configuration of the container, you can edit the default container config in `environment/config/container_configs/default.json`, or specify a custom container config JSON file when executing `run_agent.py`. If you'd like to run the agent with a GPU, you can set `"gpus": -1` in the container config JSON file.
 
 ## Benchmarking
 

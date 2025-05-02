@@ -1,5 +1,2 @@
 random-acts-of-pizza
 spooky-author-identification
-aerial-cactus-identification
-text-normalization-challenge-english-language
-text-normalization-challenge-russian-language

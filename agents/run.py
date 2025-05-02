@@ -113,8 +113,6 @@ def run(
         Path to the output file.
     """
 
-    if os.getenv("MBX_NO_DOCKER", "0") == "1":
-        return run_locally(competition, agent, run_dir, logger)
     volumes_config = {
         competition.public_dir.resolve().as_posix(): {
             "bind": "/home/data",

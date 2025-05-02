@@ -90,7 +90,7 @@ class Registry:
                 {
                     **contents[agent_id],
                     "id": agent_id,
-                    "name": fpath.parent.name,
+                    "name": fpath.parent.name,  # this will be 'aide-deepseek' I guess
                     "agents_dir": agents_dir,
                     "kwargs": kwargs,
                     "kwargs_type": kwargs_type,
