@@ -1,2 +1,5 @@
 random-acts-of-pizza
 spooky-author-identification
+aerial-cactus-identification
+denoising-dirty-documents
+nomad2018-predict-transparent-conductors

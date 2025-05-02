@@ -119,3 +119,6 @@ exit 0
 
 # zip -r Deepseek-r1-32b_nomad2018-logs.zip ./logs/32b_nomad2018 &
 # zip -r Deepseek-r1-32b_nomad2018-workspace.zip ./32b_nomad2018 &
+
+
+# python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide 

@@ -263,3 +263,18 @@ Please cite using the following BibTeX entry:
   url={https://arxiv.org/abs/2410.07095}
 }
 ```
+
+
+python3 -m vllm.entrypoints.openai.api_server \
+    --model  "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2" \
+    --port 8000 \
+    --dtype bfloat16 \
+    --device cuda \
+    --gpu-memory-utilization 0.9 \
+    --max-model-len 8196 \
+    --quantization gptq 
+
+
+    # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide 
+    AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4
+    "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"

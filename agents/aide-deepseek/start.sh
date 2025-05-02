@@ -76,7 +76,7 @@ timeout $TIME_LIMIT_SECS
 aide \
   data_dir="${HOME_DIR}/data/" \
   desc_file="${AGENT_DIR}/full_instructions.txt" \
-  agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" \
+  agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
   "$@" # forward the bash arguments to aide
 if [ $? -eq 124 ]; then
   echo "Timed out after $TIME_LIMIT"
