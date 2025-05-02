@@ -1,10 +1,10 @@
 #!/bin/bash 
-source .aide-ds/bin/activate
+# source .aide-ds/bin/activate
 export TOKENIZERS_PARALLELISM=false
 
 # ollama pull deepseek-r1:32B 2>/dev/null
 echo "Current working directory: $(pwd)"
-export LLM="deepseek-r1:32B"    
+# export LLM="deepseek-r1:32B"    
 # aide data_dir="example_tasks/house_prices" \
 #     goal="Predict the sales price for each house" \
 #     eval="Use the RMSE metric between the logarithm of the predicted and observed values."\

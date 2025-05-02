@@ -1,49 +1,52 @@
 #!/bin/bash
+set -e # Exit immediately if a command exits with a non-zero status.
+set -o pipefail # Exit if any command in a pipeline fails.
 
-# Print commands and their arguments as they are executed
-set -x
+echo "Entrypoint script started."
 
-{
-  # log into /home/logs
-  LOGS_DIR=./logs
-  mkdir -p $LOGS_DIR
-
-  # chmod the /home directory such that nonroot users can work on everything within it. We do this at container start
-  # time so that anything added later in agent-specific Dockerfiles will also receive the correct permissions.
-  # (this command does `chmod a+rw /home` but with the exception of /home/data, which is a read-only volume)
-  find /home -path /home/data -prune -o -exec chmod a+rw {} \;
-  # ls -l .
-
-  # Launch grading server, stays alive throughout container lifetime to service agent requests.
-  /opt/conda/bin/python /private/grading_server.py
-} 2>&1 | tee $LOGS_DIR/entrypoint.log
-# RedHatAI/DeepSeek-R1-Distill-Qwen-32B-FP8-dynamic
-# "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"
-# Start vLLM server in the background
-echo "Starting vLLM server..."
-python -m vllm.entrypoints.openai.api_server \
+# --- STEP 1: Start vLLM server using SYSTEM Python ---
+echo "Starting vLLM server using system python..."
+# Redirect stdout and stderr to a log file
+/usr/bin/python3.11 -m vllm.entrypoints.openai.api_server \
     --model "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2" \
     --port 8000 \
     --dtype bfloat16 \
     --device cuda \
     --gpu-memory-utilization 0.9 \
     --max-model-len 13310 \
-    --quantization gptq  &
+    --quantization gptq &> /home/vllm_server.log &
+
 VLLM_PID=$!
-Wait
-echo "vLLM server started with PID: $VLLM_PID"
+echo "vLLM server started with PID: $VLLM_PID, logging to /home/vllm_server.log"
 
-# Wait for servers to initialize
-echo "Waiting for servers to initialize..."
-sleep 50
+# --- STEP 2: Wait for vLLM server to be healthy ---
+echo "Waiting for vLLM server on port 8000..."
+timeout_seconds=1200 # Give it some time to start
+start_time=$(date +%s)
+while true; do
+    current_time=$(date +%s)
+    if [ $(($current_time - $start_time)) -ge $timeout_seconds ]; then
+        echo "vLLM server did not become healthy within $timeout_seconds seconds."
+        exit 1
+    fi
+    if curl -s http://localhost:8000/health > /dev/null; then
+        echo "vLLM server is healthy."
+        break
+    fi
+    echo "vLLM server is not healthy yet, time passed -> $(($current_time - $start_time)) ."
 
-# Debug: Print current working directory and list files
-echo "Current working directory: $(pwd)"
-echo "Files in current directory:"
-ls -la
+    sleep 1
+done
 
-# Debug: Print the command to be executed
+# --- STEP 3: Activate the virtual environment ---
+echo "Activating virtual environment..."
+# Ensure this path is correct based on your Dockerfile install location
+source /home/.aide-ds/bin/activate
+echo "Virtual environment activated."
+echo "Current PATH: $PATH" # Verify PATH includes venv bin first
+
+# --- STEP 4: Execute the command passed by Aichor ---
+# This command should be your run.sh or a direct call to run_agent.py
 echo "Executing command: $@"
-
-# Execute the command passed to the container
 exec "$@"
+

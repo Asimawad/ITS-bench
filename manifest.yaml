@@ -10,7 +10,7 @@ builder:
 spec:
   operator: tf
   image: test_image
-  command: "entrypoint.sh /aide-ds/run.sh"
+  command: "entrypoint.sh /home/run.sh"
   # command: "/usr/local/bin/entrypoint.sh /aide-ds/run.sh"
   types:
     Worker: # UPDATE ME
@@ -27,6 +27,6 @@ spec:
             product: NVIDIA-H100-80GB-HBM3  # NVIDIA-A100-SXM4-80GB #
   debug:
       vscode:
-        enabled: True # required
+        enabled: false # required
         path: "/aichor/code" # Optional, defaults to "code". Refer the absolute path of the binary if not findable in $PATH
         provider: "github" # Optional, vscode tunnel provider. Options are "github" or "microsoft", defaults to "github" 
