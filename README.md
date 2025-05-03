@@ -20,6 +20,9 @@ sudo apt upgrade -y
 
 curl -fsSL https://get.docker.com | sudo sh
 
+
+docker run --gpus all -p 8000:8000 myimage
+
 add yourself to the group 
 sudo usermod -aG docker $USER
 ## Agent
@@ -278,3 +281,85 @@ python3 -m vllm.entrypoints.openai.api_server \
     # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide --n-workers 5 --n-seeds 3
     AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4
     "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"
+
+
+uv pip install \
+  --index-strategy unsafe-best-match  --extra-index-url https://download.pytorch.org/whl/cu124 torch==2.6.0+cu124 torchvision==0.21.0+cu124 torchaudio==2.6.0+cu124 \
+  -e .
+
+# 1. Spooky author comp
+# aide data_dir="data/aerial-cactus-identification" \
+#       goal="Create a classifier capable of predicting whether a 32x32 aerial image contains a cactus" \
+#       eval="Area Under the ROC Curve (AUC)" \
+#       agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#       agent.steps=200 \
+#       agent.code.max_new_tokens=2048 \
+#       agent.code.temp=0.6 \
+#       wandb.project="aerial-cactus-7b" \
+#       exp_name="aerial-cactus_7b"
+
+
+# 1. Spooky author comp
+# aide data_dir="data/$competition_id/" \ 
+#       goal="Predict the author of a sentence as one of Poe, Lovecraft, or Shelley" \
+#       eval="Use multi-class logarithmic loss between predicted author probabilities and the true label." \
+#       agent.code.model=deepseek-ai/DeepSeek-R1-Distill-Qwen-14B \
+#       agent.steps=200 \
+#       agent.code.max_new_tokens=2048 \
+#       agent.code.temp=0.6 \
+#       wandb.project="spooky-author-14B" \
+#       exp_name="14b_spooky_author"
+
+ 
+# 2. aerial-cactus-identification
+# aide data_dir="data/aerial-cactus-identification" \ 
+#      goal="Create a classifier capable of predicting whether a 32x32 aerial image contains a cactus" \
+#      eval="Area Under the ROC Curve (AUC)" \
+#      agent.code.model= "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#      agent.steps=200 \
+#      agent.code.max_new_tokens=2048 \
+#      agent.code.temp=0.6 \
+#      wandb.project="aerial-cactus-7b" \
+#      exp_name="aerial-cactus_7b"
+
+# 3. Random-Acts-0f-Pizza
+# aide data_dir="data/$competition_id/" \ 
+#      goal="Predict the probability that a textual request for pizza on Reddit resulted in the requester receiving pizza, probability that a textual request for pizza posted on Reddit will be successful" \
+#      eval="Area Under the ROC Curve using the request text and associated metadata" \
+#      agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B" \
+#      agent.steps=200 \
+#      agent.code.temp=0.6 \
+#      wandb.project="random-acts-of-pizza" \
+#      exp_name="random-acts-of-pizza_DS_32B"
+
+
+# 4. nomad2018-predict-transparent-conductors
+
+# aide data_dir="data/nomad2018-predict-transparent-conductors/" \ 
+#      goal="Predict formation energy (formation_energy_ev_natom) and bandgap energy (bandgap_energy_ev) for materials given their composition and structural properties" \
+#      eval="Mean of column-wise Root Mean Squared Logarithmic Error (RMSLE) across the two target columns" \
+#      agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#      agent.steps=200 \
+#      agent.code.max_new_tokens=2048 \
+#      agent.code.temp=0.6 \
+#      wandb.project="aide-nomad2018" \
+#      exp_name="7b_nomad2018"
+
+## jigsaw-toxic-comment-classification-challenge
+
+# aide data_dir="data/jigsaw-toxic-comment-classification-challenge"  \
+#      goal="Predict the probability for each of six types of toxicity (toxic, severe_toxic, obscene, threat, insult, identity_hate) for each given comment text" \
+#      eval="Mean column-wise ROC AUC" \
+#      agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#      agent.steps=200 \
+#      agent.code.max_new_tokens=2048 \
+#      agent.code.temp=0.6 \
+#      wandb.project="aide-jigsaw-comment" \
+#      exp_name="7b_jigsaw"
+
+
+# zip -r Deepseek-r1-32b_nomad2018-logs.zip ./logs/32b_nomad2018 &
+# zip -r Deepseek-r1-32b_nomad2018-workspace.zip ./32b_nomad2018 &
+
+
+# python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide 

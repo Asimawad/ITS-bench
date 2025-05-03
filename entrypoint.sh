@@ -1,20 +1,31 @@
 #!/bin/bash
-set -e # Exit immediately if a command exits with a non-zero status.
-set -o pipefail # Exit if any command in a pipeline fails.
+set -e                          
+set -o pipefail               
 
 echo "Entrypoint script started."
+
+export TORCH_LOGS="+dynamo"
+export VLLM_TRACE_LEVEL=DEBUG
+
 
 # --- STEP 1: Start vLLM server using SYSTEM Python ---
 echo "Starting vLLM server using system python..."
 # Redirect stdout and stderr to a log file
+touch /home/vllm_server.log
+
+
+
 /usr/bin/python3.11 -m vllm.entrypoints.openai.api_server \
     --model "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2" \
     --port 8000 \
-    --dtype bfloat16 \
+    --dtype float16 \
     --device cuda \
+    --enforce-eager \
     --gpu-memory-utilization 0.9 \
     --max-model-len 13310 \
     --quantization gptq &> /home/vllm_server.log &
+while [ ! -f /home/vllm_server.log ]; do sleep 0.2; done
+tail -n +1 -f /home/vllm_server.log &
 
 VLLM_PID=$!
 echo "vLLM server started with PID: $VLLM_PID, logging to /home/vllm_server.log"
