@@ -7,4 +7,4 @@ denoising-dirty-documents
 text-normalization-challenge-english-language
 leaf-classification
 tabular-playground-series-may-2022
-the-icml-2013-whale-challenge-right-whale-redux
+mlsp-2013-birds
