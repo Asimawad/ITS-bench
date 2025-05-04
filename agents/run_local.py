@@ -106,12 +106,14 @@ def run_locally(
     Returns:
         Path to the run_dir.
     """
-    work  = Path(__file__).resolve().parents[1] / f"{competition.id}" # "home" #run_dir.resolve()
+    work = (
+        run_dir.resolve()
+    )  #  Path(__file__).resolve().parents[1] / f"{competition.id}" # "home" #
     work.mkdir(parents=True, exist_ok=True)
 
     # --- 1. Setup Simulated Environment Directories ---
     # Simulate the /home directory within the run_dir
-    ch = work  #/ "home"  # This will be the value of HOME_DIR env var
+    ch = work / "home"  # This will be the value of HOME_DIR env var
     ch.mkdir(parents=True, exist_ok=True)
 
     # Create standard directories *under* the simulated home
