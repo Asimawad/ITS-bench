@@ -28,7 +28,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.4.20 /uv /bin/uv
 # Set environment variables
 ENV UV_SYSTEM_PYTHON=1
 ENV TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124
-COPY kaggle.json /.kaggle/
+COPY environment/kaggle.json /.kaggle/
+RUN chmod 600 /.kaggle/kaggle.json
 
 # Set working directory
 WORKDIR /home

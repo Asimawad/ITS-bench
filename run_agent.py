@@ -1,26 +1,21 @@
 import argparse
-import asyncio
 import json
 import logging
 import multiprocessing
 import os
+import threading
 import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from agents.run import run as backend_run  # single entrypoint now
-
-MBX_NO_DOCKER = (
-    os.getenv("MBX_NO_DOCKER", "0") == "1"
-)  # well, no need for docker anymore, but we wil keep it there for now
 from agents.registry import Agent
 from agents.registry import registry as agent_registry
 from agents.run_local import run_locally
+from environment.upload_results import upload_to_s3
+from environment.utils_zip import make_filtered_zip
 
 # from agents.run import run_in_container, run_locally
-from environment.defaults import DEFAULT_CONTAINER_CONFIG_PATH
 from mlebench.data import is_dataset_prepared
 from mlebench.registry import Competition, registry
 from mlebench.utils import create_run_dir, get_logger, get_runs_dir, get_timestamp
@@ -52,6 +47,9 @@ def worker_process(task: Task):
         f"Running seed {task.seed} for {task.competition.id}, agent {task.agent.name}, on port {task.port}"
     )
 
+    logger.info(
+        f"Running seed {task.seed} for {task.competition.id}, agent {task.agent.name}, on port {task.port}"
+    )
     task_output = {}
     try:
         run_locally(
@@ -59,11 +57,16 @@ def worker_process(task: Task):
             agent=task.agent,
             run_dir=task.path_to_run,
             logger=run_logger,
+            main_logger=logger,
             port=task.port,  # Pass the port
         )
         task_output["success"] = True
 
         run_logger.info(
+            f"Finished running seed {task.seed} for {task.competition.id} and agent {task.agent.name}"
+        )
+
+        logger.info(
             f"Finished running seed {task.seed} for {task.competition.id} and agent {task.agent.name}"
         )
     except Exception as e:
@@ -73,10 +76,37 @@ def worker_process(task: Task):
         run_logger.error(
             f"Run failed for seed {task.seed}, agent {task.agent.id} and competition {task.competition.id}"
         )
+        logger.error(type(e))
+        logger.error(stack_trace)
+        logger.error(
+            f"Run failed for seed {task.seed}, agent {task.agent.id} and competition {task.competition.id}"
+        )
         task_output["success"] = False
 
     # Ensure the run_dir is returned or identified for the main process if needed
     return task.run_id, task_output
+
+
+def zip_and_upload_runs(every_minutes: int = 10):
+    def task():
+        i = 1
+        while True:
+            time.sleep(every_minutes * 60)
+            timestamp = f"{i * every_minutes}min"
+            zip_name = f"runs_{timestamp}.zip"
+            zip_path = Path(zip_name)
+
+            # Zip the `runs/` folder
+            # shutil.make_archive(zip_path.stem, "zip", "runs")
+            make_filtered_zip(zip_path, "runs")
+
+            # Upload (reuse your logic here)
+            upload_to_s3(zip_path, f"{os.environ['AICHOR_OUTPUT_PATH'].rstrip('/')}/{zip_name}")
+            # upload_to_local(zip_path)
+            logger.info(f"[Checkpoint] Uploaded {zip_name} to output bucket")
+            i += 1
+
+    threading.Thread(target=task, daemon=True).start()
 
 
 def main(args):
@@ -174,13 +204,7 @@ if __name__ == "__main__":
         default=1,
         help="Number of seeds to run for each competition",
     )
-    parser.add_argument(
-        "--container-config",
-        help="Path to a JSON file with an environment configuration; these args will be passed to `docker.from_env().containers.create`",
-        type=str,
-        required=False,
-        default=DEFAULT_CONTAINER_CONFIG_PATH,
-    )
+
     parser.add_argument(
         "--retain",
         help="Whether to retain the container after the run instead of removing it.",
@@ -204,6 +228,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     logger = get_logger(__name__)
+    # zip_and_upload_runs(every_minutes=10)
 
-    # asyncio.run(main(args))
     main(args)

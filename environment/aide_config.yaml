@@ -1,9 +1,12 @@
 # settings for code execution
 exec:
   timeout: 600
-
+  
+inference_engine: "openai"
 
 agent:
   steps: 2
-  time_limit: 3600 
+  time_limit: 3600
+  code:
+    model: o3-mini 
   
