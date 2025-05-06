@@ -59,15 +59,17 @@ def grade_csv(path_to_submission: Path, competition: Competition) -> Competition
         )
 
     score = None
-    submission_exists = path_to_submission.is_file() and path_to_submission.suffix.lower() == ".csv"
+    # Resolve symlinks to get the actual file path
+    resolved_path = path_to_submission.resolve()
+    submission_exists = resolved_path.is_file() and resolved_path.suffix.lower() == ".csv"
 
     if submission_exists:
-        submission_df = read_csv(path_to_submission)
+        submission_df = read_csv(resolved_path)
         answers = load_answers(competition.answers)
         score = competition.grader(submission_df, answers)
     else:
         logger.warning(
-            f"Invalid submission file: {path_to_submission}. Please check that the file exists and it is a CSV."
+            f"Invalid submission file: {path_to_submission} (resolved to {resolved_path}). Please check that the file exists and it is a CSV."
         )
 
     valid_submission = score is not None

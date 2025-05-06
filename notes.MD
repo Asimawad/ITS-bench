@@ -1,4 +1,5 @@
 # Getting started
+
 1. Get uv 
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -25,6 +26,7 @@ docker run --gpus all -p 8000:8000 myimage
 
 add yourself to the group 
 sudo usermod -aG docker $USER
+
 ## Agent
 # Agents
 
@@ -47,9 +49,9 @@ drwxrwxrwx 1 root    root    4096 Mar  9 16:02 submission
  * Serving Flask app 'grading_server'
  * Debug mode: off -->
 
-
 ## Prerequisites
 If you want to run these agents locally:
+
 - Install [Docker](https://docs.docker.com/engine/install/)
 - Install [Sysbox](https://github.com/nestybox/sysbox). See [Security](#Security) below for more information
 - (Optional) Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) to run agents with GPUs
@@ -64,6 +66,7 @@ export AGENT_DIR=/home/agent
 
 docker build --platform=linux/amd64 -t aide agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
 ```
+
 ## build the new agent
 ```
 docker build --platform=linux/amd64 -t aide-deepseek agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
@@ -94,6 +97,7 @@ If you'd like to update the configuration of the container, you can edit the def
 ## Benchmarking
 
 This section describes a canonical setup for comparing scores on MLE-bench. We recommend the following:
+
 - Repeat each evaluation with at least 3 seeds and report the Any Medal (%) score as the mean ± one standard error of the mean. The evaluation (task and grading) itself is deterministic, but agents/LLMs can be quite high-variance!
 - Agent resources - not a strict requirement of the benchmark but please report if you stray from these defaults!
   - Runtime: 24 hours
@@ -101,7 +105,6 @@ This section describes a canonical setup for comparing scores on MLE-bench. We r
 - Include a breakdown of your scores across Low, Medium, High, and All complexity [splits](experiments/splits) (see *Lite evaluation* below for why this is useful).
 
 We demonstrate how this looks in practice by reporting the main results from [our paper (Table 2)](https://arxiv.org/abs/2410.07095) in the table below:
-
 
 ### Lite Evaluation
 
@@ -186,11 +189,10 @@ mlebench prepare -c <competition-id> --data-dir .
 
 Run `mlebench prepare --help` to see the list of available competitions.
 
-
-
 ## Grading Submissions
 
 Answers for competitions must be submitted in CSV format; the required format is described in each competition's description, or shown in a competition's sample submission file. You can grade multiple submissions by using the `mlebench grade` command. Given a JSONL file, where each line corresponds with a submission for one competition, `mlebench grade` will produce a grading report for each competition. The JSONL file must contain the following fields:
+
 - `competition_id`: the ID of the competition in our dataset.
 - `submission_path`: a `.csv` file with the predictions for the specified
   competition.
@@ -208,9 +210,11 @@ See more information by running `mlebench grade-sample --help`.
 ```bash
 mlebench grade-sample --data-dir  submission   --output-dir  competition_id
 ```
+
 ## Environment
 
 We provide a base Docker image `mlebench-env` which is the base environment for our agents. This base image contains:
+
 - Conda environment used to execute our agents. We optionally (default true) install Python packages in this environment which are commonly used across our agents. If you don't want to install these packages, set the `INSTALL_HEAVY_DEPENDENCIES` environment variable to `false` when building the image, by adding `--build-arg INSTALL_HEAVY_DEPENDENCIES=false` to the `docker build` command below
 - Instructions for agents to follow when creating their submission
 - Grading server for agents to use when checking that the structure of their submission is correct
@@ -220,6 +224,7 @@ Build this image by running:
 ```bash
 docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile . --build-arg INSTALL_HEAVY_DEPENDENCIES=false
 ```
+
 ## Agents
 
 We purposefully designed our benchmark to not make any assumptions about the agent that produces submissions, so agents can more easily be evaluated on this benchmark. We evaluated three open-source agents; we discuss this procedure in [agents/README.md](agents/README.md).
@@ -239,6 +244,7 @@ We collect example usage of this library in the `examples/` directory, see [exam
 
 We place the code specific to the experiments from our publication of the
 benchmark in the `experiments/` directory:
+
 - For instance, our competition splits are available in `experiments/splits/`.
 - For a completed set of runs from a given agent, you can use the provided
 `experiments/make_submission.py` script to compile its submission for grading.
@@ -255,6 +261,7 @@ Chan Jun Shern, Neil Chowdhury, Oliver Jaffe, James Aung, Dane Sherburn, Evan Ma
 ## Citation
 
 Please cite using the following BibTeX entry:
+
 ```
 @article{chan2024mle-bench,
   title={MLE-bench: Evaluating Machine Learning Agents on Machine Learning Engineering},
@@ -267,7 +274,6 @@ Please cite using the following BibTeX entry:
 }
 ```
 
-
 python3 -m vllm.entrypoints.openai.api_server \
     --model  "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2" \
     --port 8000 \
@@ -277,11 +283,9 @@ python3 -m vllm.entrypoints.openai.api_server \
     --max-model-len 13310 \
     --quantization gptq 
 
-
-    # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide --n-workers 5 --n-seeds 3
-    AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4
-    "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"
-
+# python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide --n-workers 5 --n-seeds 3
+AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4
+"ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"
 
 uv pip install \
   --index-strategy unsafe-best-match  --extra-index-url https://download.pytorch.org/whl/cu124 torch==2.6.0+cu124 torchvision==0.21.0+cu124 torchaudio==2.6.0+cu124 \
@@ -298,7 +302,6 @@ uv pip install \
 #       wandb.project="aerial-cactus-7b" \
 #       exp_name="aerial-cactus_7b"
 
-
 # 1. Spooky author comp
 # aide data_dir="data/$competition_id/" \ 
 #       goal="Predict the author of a sentence as one of Poe, Lovecraft, or Shelley" \
@@ -310,7 +313,6 @@ uv pip install \
 #       wandb.project="spooky-author-14B" \
 #       exp_name="14b_spooky_author"
 
- 
 # 2. aerial-cactus-identification
 # aide data_dir="data/aerial-cactus-identification" \ 
 #      goal="Create a classifier capable of predicting whether a 32x32 aerial image contains a cactus" \
@@ -331,7 +333,6 @@ uv pip install \
 #      agent.code.temp=0.6 \
 #      wandb.project="random-acts-of-pizza" \
 #      exp_name="random-acts-of-pizza_DS_32B"
-
 
 # 4. nomad2018-predict-transparent-conductors
 
@@ -357,9 +358,114 @@ uv pip install \
 #      wandb.project="aide-jigsaw-comment" \
 #      exp_name="7b_jigsaw"
 
-
 # zip -r Deepseek-r1-32b_nomad2018-logs.zip ./logs/32b_nomad2018 &
 # zip -r Deepseek-r1-32b_nomad2018-workspace.zip ./32b_nomad2018 &
 
-
 # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide 
+
+___
+## Evaluation 
+1. First, Prepare the Dataset
+```bash
+mlebench prepare --lite --data-dir ./data
+# OR for specific competitions
+mlebench prepare -c competition1 -c competition2 --data-dir ./data
+```
+
+2.Organize Submissions
+Create a JSONL file that maps submissions to their respective competitions. The JSONL file should have one JSON object per line with this structure:
+
+```bash
+{"competition_id": "competition1", "submission_path": "/path/to/competition1_submission.csv"}
+{"competition_id": "competition2", "submission_path": "/path/to/competition2_submission.csv"}
+```
+
+3. Run the Evaluation
+```bash
+mlebench grade --submission submission_paths.jsonl --output-dir evaluation_results
+```
+
+4. To Evaluate individual competitions 
+```bash
+mlebench grade-sample submissions/competition_submission.csv competition-id
+```
+
+## Complete MLE-bench evaluation:
+
+1. **Multiple Seeds Evaluation**
+> "Repeat each evaluation with at least 3 seeds and report the Any Medal (%) score as the mean ± one standard error of the mean."
+
+1. **Complexity Splits Evaluation**
+The evaluation should be performed across different complexity levels:
+
+- Low complexity (Lite) split
+- Medium complexity split
+- High complexity split
+- All competitions
+
+1. **Resource Requirements**
+The evaluation should be performed with specific resource constraints:
+
+- Runtime: 24 hours
+- Compute: 36 vCPUs with 440GB RAM and one 24GB A10 GPU
+
+Here's the complete evaluation process:
+
+1. **Prepare the Dataset**
+```bash
+# For Lite evaluation (Low complexity)
+mlebench prepare --lite --data-dir ./data
+```
+
+2. **Run Multiple Seeds**
+For each seed (at least 3):
+```bash
+# Run your agent on the competitions
+python run_agent.py --agent-id your_agent --competition-set experiments/splits/all.txt --n-seeds 3
+```
+
+3. **Generate Submission Files**
+For each run group:
+```bash
+python experiments/make_submission.py --metadata runs/<run-group>/metadata.json --output runs/<run-group>/submission.jsonl
+```
+
+4. **Grade the Submissions**
+For each run group:
+```bash
+mlebench grade --submission runs/<run-group>/submission.jsonl --output-dir runs/<run-group>
+```
+
+5. **Repeat for Different Complexity Splits**
+```bash
+# Low complexity (Lite)
+python run_agent.py --agent-id your_agent --competition-set experiments/splits/low.txt --n-seeds 3
+
+# Medium complexity
+python run_agent.py --agent-id your_agent --competition-set experiments/splits/medium.txt --n-seeds 3
+
+# High complexity
+python run_agent.py --agent-id your_agent --competition-set experiments/splits/high.txt --n-seeds 3
+```
+
+6. **Aggregate Results**
+The final results should be reported as:
+
+- Any Medal (%) score as mean ± standard error across seeds
+- Broken down by complexity level (Low/Medium/High/All)
+- With the specified resource constraints
+
+The evaluation metrics include:
+
+- Individual competition scores
+- Medal status (gold/silver/bronze)
+- Above median status
+- Medal thresholds
+- Submission validity
+
+1. Statistical significance through multiple seeds
+2. Coverage across different complexity levels
+3. Fair comparison under standardized resource constraints
+4. Proper aggregation and reporting of results
+
+mlebench grade --submission runs/2025-05-06T17-22-48-GMT_run-group_aide-deepseek/submission_paths.jsonl --output-dir evaluation_results
