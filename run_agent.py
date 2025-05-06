@@ -59,6 +59,7 @@ def worker_process(task: Task):
             logger=run_logger,
             main_logger=logger,
             port=task.port,
+            seed=task.seed,
         )
         task_output["success"] = True
 
@@ -140,7 +141,7 @@ def main(args):
     for seed in range(args.n_seeds):
         for competition_id in competition_ids:
             competition = registry.get_competition(competition_id)
-            run_dir = create_run_dir(competition.id, agent.id, run_group)
+            run_dir = create_run_dir(competition.id, agent.id, run_group, seed)
             run_id = run_dir.stem
             task = Task(
                 run_id=run_id,

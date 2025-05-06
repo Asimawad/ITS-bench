@@ -88,6 +88,7 @@ def run_locally(
     logger: logging.Logger,
     main_logger=logging.Logger,
     retain_workspace: bool = False,
+    seed: int = 0,
 ) -> Path:
     """
     Execute `agent` on `competition` locally.
@@ -103,12 +104,13 @@ def run_locally(
         port: The specific network port the grading server should listen on.
         logger: Logger instance for the run.
         retain_workspace: If True, the full temporary workspace is kept.
+        seed: The seed number for this run.
 
     Returns:
         Path to the run_dir.
     """
     logger.info(
-        f"Starting local execution for competition {competition.id} with agent {agent.name}"
+        f"Starting local execution for competition {competition.id} with agent {agent.name} (seed {seed})"
     )
     logger.info(f"Run directory: {run_dir}")
     logger.info(f"Port assigned: {port}")
@@ -169,7 +171,7 @@ def run_locally(
     ] = f"${{HOME_DIR}}/{simulated_public_data_dest.relative_to(ch).as_posix()}"  # e.g. ${HOME_DIR}/data
     # start.sh creates full_instructions.txt in AGENT_DIR
     aide_config_dict["desc_file"] = f"${{AGENT_DIR}}/full_instructions.txt"  # Match start.sh logic
-
+    # aide_config_dict["seed"] = seed
     # --- 4. Create Symlinks for Submission Files ---
     logger.info("Creating symlinks for submission files...")
     workspaces_dir = ch / "workspaces"
@@ -222,6 +224,12 @@ def run_locally(
                 f"Unknown agent kwargs_type: {agent.kwargs_type}. Skipping passing agent.kwargs."
             )
 
+        # Add seed to agent arguments
+        if agent.kwargs_type == "argparse":
+            agent_override_args += ["--seed", str(seed)]
+        elif agent.kwargs_type == "omegaconf":
+            agent_override_args += [f"seed={seed}"]
+
         # Combine default config args and agent override args
         # Agent overrides should come LAST so they take precedence
         final_aide_args = aide_cli_args + agent_override_args
@@ -247,7 +255,7 @@ def run_locally(
                 "PRIVATE_DATA_DIR": str(
                     simulated_private_data_root.resolve()
                 ),  # Local path to simulated /private
-                # You might need to add other env vars your agent expects here
+                "SEED": str(seed),  # Pass the seed to the agent
             }
         )
 

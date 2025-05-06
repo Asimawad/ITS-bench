@@ -32,7 +32,7 @@ def find_submission_paths(run_dir: Path) -> list:
                             paths.append(
                                 {
                                     "competition_id": competition_id,
-                                    "submission_path": str(submission_file.absolute()),
+                                    "submission_path": str(submission_file.relative_to(run_dir)),
                                 }
                             )
 
