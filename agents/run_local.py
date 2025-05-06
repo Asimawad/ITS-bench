@@ -152,7 +152,13 @@ def run_locally(
     # Note: simulated_private_data_root is already created above
 
     # --- 3. Generate AIDE Command-Line Arguments from Config and Agent Kwargs ---
-    aide_config_dict = DEFAULT_AIDE_CONFIG.copy()
+    aide_config_dict = {}
+    try:
+        aide_config_dict = DEFAULT_AIDE_CONFIG.copy()
+    except Exception as e:
+        logger.error(f"Error copying default AIDE config: {e}")
+        logger.error(traceback.format_exc())
+        # sys.exit(1)
 
     # Path to data *as seen by the agent* (relative to HOME_DIR)
     aide_config_dict[
