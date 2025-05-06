@@ -23,6 +23,7 @@ __pycache__/
 # .gitignore
 *.pyc
 lite_dataset/
+notes.md
 # C extensions
 *.so
 submission.csv

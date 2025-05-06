@@ -39,51 +39,57 @@ def worker_process(task: Task):
     run_logger = get_logger(str(task.path_to_run))
     log_file_handler = logging.FileHandler(task.path_to_run / "run.log")
     log_file_handler.setFormatter(logging.getLogger().handlers[0].formatter)
-    # log_file_handler.setFormatter(logging.getLogger().handlers[0].formatter())  # match the formatting we have
     run_logger.addHandler(log_file_handler)
     run_logger.propagate = False
 
     run_logger.info(
-        f"Running seed {task.seed} for {task.competition.id}, agent {task.agent.name}, on port {task.port}"
+        f"Starting task - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
     )
 
     logger.info(
-        f"Running seed {task.seed} for {task.competition.id}, agent {task.agent.name}, on port {task.port}"
+        f"Starting task - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
     )
     task_output = {}
     try:
+        run_logger.info(f"Initializing environment for task...")
         run_locally(
             competition=task.competition,
             agent=task.agent,
             run_dir=task.path_to_run,
             logger=run_logger,
             main_logger=logger,
-            port=task.port,  # Pass the port
+            port=task.port,
         )
         task_output["success"] = True
 
         run_logger.info(
-            f"Finished running seed {task.seed} for {task.competition.id} and agent {task.agent.name}"
+            f"Task completed successfully - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
         )
 
         logger.info(
-            f"Finished running seed {task.seed} for {task.competition.id} and agent {task.agent.name}"
+            f"Task completed successfully - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
         )
     except Exception as e:
         stack_trace = traceback.format_exc()
-        run_logger.error(type(e))
-        run_logger.error(stack_trace)
+        run_logger.error(f"Task failed with error type: {type(e).__name__}")
+        run_logger.error(f"Error details: {str(e)}")
+        run_logger.error(f"Stack trace:\n{stack_trace}")
         run_logger.error(
-            f"Run failed for seed {task.seed}, agent {task.agent.id} and competition {task.competition.id}"
+            f"Task failed - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
         )
-        logger.error(type(e))
-        logger.error(stack_trace)
+        logger.error(f"Task failed with error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e)}")
+        logger.error(f"Stack trace:\n{stack_trace}")
         logger.error(
-            f"Run failed for seed {task.seed}, agent {task.agent.id} and competition {task.competition.id}"
+            f"Task failed - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
         )
         task_output["success"] = False
+        task_output["error"] = {
+            "type": type(e).__name__,
+            "message": str(e),
+            "stack_trace": stack_trace,
+        }
 
-    # Ensure the run_dir is returned or identified for the main process if needed
     return task.run_id, task_output
 
 

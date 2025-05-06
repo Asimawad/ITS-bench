@@ -13,7 +13,7 @@ dependencies = [
   "fastparquet>=2024.5.0",
   "kaggle>=1.6,<1.7",
   "levenshtein>=0.25.1",
-  "openai>=1.10.0",
+  "openai==1.65.0",
   "pandas>=2.2",
   "pyyaml>=6.0",
   "py7zr>=0.21",
@@ -33,6 +33,7 @@ dependencies = [
   "shapely>=2.0.5",
   "ruff>=0.9.10",
   "git-lfs",
+  "s3fs",
   "flask>=2.3",
   "werkzeug>=2.3"
 ]
@@ -46,6 +47,7 @@ mlebench = "mlebench.cli:main"
 [project.optional-dependencies]
 formatters = ["black>=23.3", "isort>=5.13"]
 dev = ["pytest>=8.2", "mypy>=1.10", "pre-commit>=3.7"]
+aide = ["aide-ds @ git+https://github.com/Asimawad/aide-ds.git"]
 
 [tool.setuptools.package-data]
 mlebench = ["competitions/**/*"]

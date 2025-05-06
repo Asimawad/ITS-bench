@@ -1,0 +1,3 @@
+aide-ds @ git+https://github.com/Asimawad/aide-ds.git 
+openai==1.65.0
+python-dotenv==1.0.1

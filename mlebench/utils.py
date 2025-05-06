@@ -9,7 +9,10 @@ import uuid
 import zipfile
 from logging import Logger
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+if TYPE_CHECKING:
+    from kaggle.api.kaggle_api_extended import KaggleApi
 
 import pandas as pd
 import py7zr
@@ -26,8 +29,6 @@ def authenticate_kaggle_api() -> "KaggleApi":
     """Authenticates the Kaggle API and returns an authenticated API object, or raises an error if authentication fails."""
     try:
         # only import when necessary; otherwise kaggle asks for API key on import
-        from kaggle.api.kaggle_api_extended import KaggleApi
-
         api = KaggleApi()
         api.authenticate()
         api.competitions_list()  # a cheap op that requires authentication
@@ -229,7 +230,7 @@ def is_empty(dir: Path) -> bool:
 def get_logger(name: str, level: int = logging.INFO, filename: Optional[Path] = None) -> Logger:
     logging.basicConfig(
         level=level,
-        format="[%(asctime)s] [%(filename)s:%(lineno)d] %(message)s",
+        format="[%(asctime)s] [%(levelname)s] [%(process)d] [%(filename)s:%(lineno)d] [%(name)s] %(message)s",
         filename=filename,
     )
     return logging.getLogger(name)

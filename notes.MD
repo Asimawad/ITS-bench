@@ -1,6 +1,95 @@
-# MLE-bench
+# Getting started
+1. Get uv 
 
-Code for the paper ["MLE-Bench: Evaluating Machine Learning Agents on Machine Learning Engineering"](https://arxiv.org/abs/2410.07095). We have released the code used to construct the dataset, the evaluation logic, as well as the agents we evaluated for this benchmark.
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+2. get python 3.11.11
+
+3. create a virtual environment
+
+uv venv --python python3.11.11 .aide-ds
+source .aide-ds/bin/activate
+
+then simply 
+uv pip install --index-strategy unsafe-best-match  --extra-index-url https://download.pytorch.org/whl/cu124 torch==2.6.0+cu124 torchvision==0.21.0+cu124 torchaudio==2.6.0+cu124 -e .
+uv sync --active
+
+4. set docker
+sudo apt update
+sudo apt upgrade -y
+
+curl -fsSL https://get.docker.com | sudo sh
+
+
+docker run --gpus all -p 8000:8000 myimage
+
+add yourself to the group 
+sudo usermod -aG docker $USER
+## Agent
+# Agents
+
+export MBX_NO_DOCKER=1
+
+<!-- (ITS-bench) asim@omen:~/Desktop/ITS-bench$ docker run -it mlebench-env:latest /bin/bash
++ tee /entrypoint.log
++ LOGS_DIR=/home/logs
++ mkdir -p /home/logs
++ find /home -path /home/data -prune -o -exec chmod a+rw '{}' ';'
++ ls -l /home
+total 28
+-rw-rw-rw- 1 root    root    2789 Feb 25 18:26 instructions.txt
+-rw-rw-rw- 1 root    root    2586 Feb 25 18:26 instructions_obfuscated.txt
+drwxrwxrwx 2 root    root    4096 Apr 30 10:36 logs
+drwxrwxrwx 1 nonroot nonroot 4096 Mar  9 16:02 nonroot
+drwxrwxrwx 1 root    root    4096 Mar  9 16:02 submission
+-rw-rw-rw- 1 root    root     494 Feb 25 18:26 validate_submission.sh
++ /opt/conda/bin/python /private/grading_server.py
+ * Serving Flask app 'grading_server'
+ * Debug mode: off -->
+
+
+## Prerequisites
+If you want to run these agents locally:
+- Install [Docker](https://docs.docker.com/engine/install/)
+- Install [Sysbox](https://github.com/nestybox/sysbox). See [Security](#Security) below for more information
+- (Optional) Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) to run agents with GPUs
+
+To build an image for an agent with ID `<agent>`, run:
+
+```bash
+export SUBMISSION_DIR=/home/submission
+export LOGS_DIR=/home/logs
+export CODE_DIR=/home/code
+export AGENT_DIR=/home/agent
+
+docker build --platform=linux/amd64 -t aide agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
+```
+## build the new agent
+```
+docker build --platform=linux/amd64 -t aide-deepseek agents/aide-deepseek/ --build-arg SUBMISSION_DIR=$SUBMISSION_DIR --build-arg LOGS_DIR=$LOGS_DIR --build-arg CODE_DIR=$CODE_DIR --build-arg AGENT_DIR=$AGENT_DIR
+```
+
+## Running agents
+
+Our `run_agent.py` script allows you to run agents locally on a given set of competitions. In the `experiments/splits/` directory, we have several files, each containing a set of competition IDs. The `experiments/splits/all.txt` file contains all competitions. The `experiments/splits/spaceship-titanic.txt` split just contains the Spaceship Titanic competition, which is useful for testing. For example, to run the dummy agent on the Spaceship Titanic competition, you can run:
+
+```bash 
+python run_agent.py --agent-id aide --competition-set experiments/splits/chosen_competetions.txt --data-dir Dataset
+```
+
+Running `run_agent.py` will creates a "run group" directory in the `runs/` directory. The run group directory will contain a subdirectory for each competition that the agent was evaluated on, containing the agent's logs, code, and submission. A `metadata.json` file will be created on finish within the run group directory, summarizing the results of the runs. You can then grade this run using the `metadata.json` file. For example, to grade the run group `<run-group>`, you can first use `experiments/make_submission.py` to generate a submission JSONL file:
+
+```bash
+python experiments/make_submission.py --metadata runs/<run-group>/metadata.json --output runs/<run-group>/submission.jsonl
+```
+
+You can then use the `mlebench grade` command to grade this submission:
+
+```bash
+mlebench grade --submission runs/<run-group>/submission.jsonl --output-dir runs/<run-group>
+```
+
+If you'd like to update the configuration of the container, you can edit the default container config in `environment/config/container_configs/default.json`, or specify a custom container config JSON file when executing `run_agent.py`. If you'd like to run the agent with a GPU, you can set `"gpus": -1` in the container config JSON file.
 
 ## Benchmarking
 
@@ -13,14 +102,6 @@ This section describes a canonical setup for comparing scores on MLE-bench. We r
 
 We demonstrate how this looks in practice by reporting the main results from [our paper (Table 2)](https://arxiv.org/abs/2410.07095) in the table below:
 
-| Agent | Low == Lite (%) | Medium (%) | High (%) | All (%) |
-|---------|--------|-----------|---------|----------|
-| AIDE o1-preview | 34.3 ± 2.4 | 8.8 ± 1.1 | 10.0 ± 1.9 | 16.9 ± 1.1 |
-| AIDE gpt-4o-2024-08-06 | 19.0 ± 1.3 | 3.2 ± 0.5 | 5.6 ± 1.0 | 8.6 ± 0.5 |
-| AIDE claude-3-5-sonnet-20240620 | 19.4 ± 4.9 | 2.6 ± 1.5 | 2.3 ± 2.3 | 7.5 ± 1.8 |
-| OpenHands gpt-4o-2024-08-06 | 11.5 ± 3.4 | 2.2 ± 1.3 | 1.9 ± 1.9 | 5.1 ± 1.3 |
-| AIDE llama-3.1-405b-instruct | 8.3 ± 2.6 | 1.2 ± 0.8 | 0.0 ± 0.0 | 3.1 ± 0.9 |
-| MLAB gpt-4o-2024-08-06 | 4.2 ± 1.5 | 0.0 ± 0.0 | 0.0 ± 0.0 | 1.3 ± 0.5 |
 
 ### Lite Evaluation
 
@@ -81,35 +162,26 @@ pre-commit install
 
 ## Dataset
 
-The MLE-bench dataset is a collection of 75 Kaggle competitions which we use to evaluate the ML engineering capabilities of AI systems.
-
-Since Kaggle does not provide the held-out test set for each competition, we
-provide preparation scripts that split the publicly available training set into
-a new training and test set.
-
-For each competition, we also provide grading scripts that can be used to
-evaluate the score of a submission.
-
 We use the [Kaggle API](https://github.com/Kaggle/kaggle-api) to download the
 raw datasets. Ensure that you have downloaded your Kaggle credentials
 (`kaggle.json`) and placed it in the `~/.kaggle/` directory (this is the default
 location where the Kaggle API looks for your credentials). To download and prepare the MLE-bench dataset, run the following, which will download and prepare the dataset in your system's default cache directory. Note, we've found this to take two days when running from scratch:
 
 ```console
-mlebench prepare --all
+mlebench prepare --all --data-dir all_datasets
 ```
 
 To prepare the lite dataset, run:
 
 ```console
-mlebench prepare --lite
+mlebench prepare --lite --data-dir lite_dataset
 ```
 
 Alternatively, you can prepare the dataset for a specific competition by
 running:
 
 ```console
-mlebench prepare -c <competition-id>
+mlebench prepare -c <competition-id> --data-dir .
 ```
 
 Run `mlebench prepare --help` to see the list of available competitions.
@@ -133,6 +205,9 @@ mlebench grade-sample <PATH_TO_SUBMISSION> spaceship-titanic
 
 See more information by running `mlebench grade-sample --help`.
 
+```bash
+mlebench grade-sample --data-dir  submission   --output-dir  competition_id
+```
 ## Environment
 
 We provide a base Docker image `mlebench-env` which is the base environment for our agents. This base image contains:
@@ -143,9 +218,8 @@ We provide a base Docker image `mlebench-env` which is the base environment for 
 Build this image by running:
 
 ```bash
-docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile .
+docker build --platform=linux/amd64 -t mlebench-env -f environment/Dockerfile . --build-arg INSTALL_HEAVY_DEPENDENCIES=false
 ```
-
 ## Agents
 
 We purposefully designed our benchmark to not make any assumptions about the agent that produces submissions, so agents can more easily be evaluated on this benchmark. We evaluated three open-source agents; we discuss this procedure in [agents/README.md](agents/README.md).
@@ -192,3 +266,100 @@ Please cite using the following BibTeX entry:
   url={https://arxiv.org/abs/2410.07095}
 }
 ```
+
+
+python3 -m vllm.entrypoints.openai.api_server \
+    --model  "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2" \
+    --port 8000 \
+    --dtype bfloat16 \
+    --device cuda \
+    --gpu-memory-utilization 0.9 \
+    --max-model-len 13310 \
+    --quantization gptq 
+
+
+    # python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide --n-workers 5 --n-seeds 3
+    AXERA-TECH/DeepSeek-R1-Distill-Qwen-7B-GPTQ-Int4
+    "ModelCloud/DeepSeek-R1-Distill-Qwen-7B-gptqmodel-4bit-vortex-v2"
+
+
+uv pip install \
+  --index-strategy unsafe-best-match  --extra-index-url https://download.pytorch.org/whl/cu124 torch==2.6.0+cu124 torchvision==0.21.0+cu124 torchaudio==2.6.0+cu124 \
+  -e .
+
+# 1. Spooky author comp
+# aide data_dir="data/aerial-cactus-identification" \
+#       goal="Create a classifier capable of predicting whether a 32x32 aerial image contains a cactus" \
+#       eval="Area Under the ROC Curve (AUC)" \
+#       agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#       agent.steps=200 \
+#       agent.code.max_new_tokens=2048 \
+#       agent.code.temp=0.6 \
+#       wandb.project="aerial-cactus-7b" \
+#       exp_name="aerial-cactus_7b"
+
+
+# 1. Spooky author comp
+# aide data_dir="data/$competition_id/" \ 
+#       goal="Predict the author of a sentence as one of Poe, Lovecraft, or Shelley" \
+#       eval="Use multi-class logarithmic loss between predicted author probabilities and the true label." \
+#       agent.code.model=deepseek-ai/DeepSeek-R1-Distill-Qwen-14B \
+#       agent.steps=200 \
+#       agent.code.max_new_tokens=2048 \
+#       agent.code.temp=0.6 \
+#       wandb.project="spooky-author-14B" \
+#       exp_name="14b_spooky_author"
+
+ 
+# 2. aerial-cactus-identification
+# aide data_dir="data/aerial-cactus-identification" \ 
+#      goal="Create a classifier capable of predicting whether a 32x32 aerial image contains a cactus" \
+#      eval="Area Under the ROC Curve (AUC)" \
+#      agent.code.model= "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#      agent.steps=200 \
+#      agent.code.max_new_tokens=2048 \
+#      agent.code.temp=0.6 \
+#      wandb.project="aerial-cactus-7b" \
+#      exp_name="aerial-cactus_7b"
+
+# 3. Random-Acts-0f-Pizza
+# aide data_dir="data/$competition_id/" \ 
+#      goal="Predict the probability that a textual request for pizza on Reddit resulted in the requester receiving pizza, probability that a textual request for pizza posted on Reddit will be successful" \
+#      eval="Area Under the ROC Curve using the request text and associated metadata" \
+#      agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B" \
+#      agent.steps=200 \
+#      agent.code.temp=0.6 \
+#      wandb.project="random-acts-of-pizza" \
+#      exp_name="random-acts-of-pizza_DS_32B"
+
+
+# 4. nomad2018-predict-transparent-conductors
+
+# aide data_dir="data/nomad2018-predict-transparent-conductors/" \ 
+#      goal="Predict formation energy (formation_energy_ev_natom) and bandgap energy (bandgap_energy_ev) for materials given their composition and structural properties" \
+#      eval="Mean of column-wise Root Mean Squared Logarithmic Error (RMSLE) across the two target columns" \
+#      agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#      agent.steps=200 \
+#      agent.code.max_new_tokens=2048 \
+#      agent.code.temp=0.6 \
+#      wandb.project="aide-nomad2018" \
+#      exp_name="7b_nomad2018"
+
+## jigsaw-toxic-comment-classification-challenge
+
+# aide data_dir="data/jigsaw-toxic-comment-classification-challenge"  \
+#      goal="Predict the probability for each of six types of toxicity (toxic, severe_toxic, obscene, threat, insult, identity_hate) for each given comment text" \
+#      eval="Mean column-wise ROC AUC" \
+#      agent.code.model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+#      agent.steps=200 \
+#      agent.code.max_new_tokens=2048 \
+#      agent.code.temp=0.6 \
+#      wandb.project="aide-jigsaw-comment" \
+#      exp_name="7b_jigsaw"
+
+
+# zip -r Deepseek-r1-32b_nomad2018-logs.zip ./logs/32b_nomad2018 &
+# zip -r Deepseek-r1-32b_nomad2018-workspace.zip ./32b_nomad2018 &
+
+
+# python run_agent.py --competition-set experiments/splits/chosen_competions.txt --agent-id aide 
