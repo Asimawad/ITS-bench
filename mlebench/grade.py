@@ -23,20 +23,23 @@ def grade_jsonl(
     Grades multiple submissions stored in a JSONL file.
     Saves the aggregated report as a JSON file.
     """
-
+    seed = path_to_submissions.stem.split("_")[-1]
     submissions = read_jsonl(path_to_submissions, skip_commented_out_lines=True)
     competitions_reports = []
+    output_dir.mkdir(exist_ok=True)
+    # Get the run directory from the submissions file path
+    run_dir = path_to_submissions.parent
 
     for submission in tqdm(submissions, desc="Grading submissions", unit="submission"):
         submission_path = Path(str(submission["submission_path"]))
         competition_id = submission["competition_id"]
         competition = registry.get_competition(competition_id)
-        single_report = grade_csv(submission_path, competition)
+        single_report = grade_csv(submission_path, competition, run_dir)
         competitions_reports.append(single_report)
 
     aggregated_report = aggregate_reports(competitions_reports)
     timestamp = get_timestamp()
-    save_path = output_dir / f"{timestamp}_grading_report.json"
+    save_path = output_dir / f"{timestamp}_seed_{seed}_grading_report.json"
     logger.info(
         json.dumps(
             {k: v for k, v in aggregated_report.items() if k != "competition_reports"}, indent=4
@@ -49,7 +52,9 @@ def grade_jsonl(
     logger.info(purple(f"Saved summary report to {save_path}"))
 
 
-def grade_csv(path_to_submission: Path, competition: Competition) -> CompetitionReport:
+def grade_csv(
+    path_to_submission: Path, competition: Competition, run_dir: Path
+) -> CompetitionReport:
     """Grades a submission CSV for the given competition."""
 
     if not is_dataset_prepared(competition, grading_only=True):
@@ -59,8 +64,8 @@ def grade_csv(path_to_submission: Path, competition: Competition) -> Competition
         )
 
     score = None
-    # Resolve symlinks to get the actual file path
-    resolved_path = path_to_submission.resolve()
+    # Resolve symlinks to get the actual file path, using run_dir as base
+    resolved_path = (run_dir / path_to_submission).resolve()
     submission_exists = resolved_path.is_file() and resolved_path.suffix.lower() == ".csv"
 
     if submission_exists:

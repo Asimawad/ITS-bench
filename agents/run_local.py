@@ -17,10 +17,18 @@ from mlebench.utils import purple
 # Import dotenv_values - Assume .shared_env is in the parent directory of THIS script's directory
 # e.g., if run_local.py is in /path/to/repo/environment/, .shared_env is in /path/to/repo/
 try:
+    # Ensure __file__ is defined (e.g., not running in an interactive session where it might be missing)
+    if "__file__" not in globals():
+        raise NameError(
+            "__file__ not defined. This script might be running in an environment where __file__ is not available."
+        )
     shared_env_path = Path(__file__).parent.parent.resolve() / ".shared_env"
     CONSTANTS = dotenv_values(shared_env_path)
 except FileNotFoundError:
     logging.error(f"'.shared_env' file not found at {shared_env_path}. Please create it.")
+    sys.exit(1)
+except NameError as e:
+    logging.error(f"Could not determine shared_env_path: {e}")
     sys.exit(1)
 except Exception as e:
     logging.error(f"Failed to load .shared_env file: {e}")
@@ -31,6 +39,10 @@ except Exception as e:
 # Assumes the base aide config template is at project root / environment / aide_config.yaml
 # project root is two levels up from this script's directory
 try:
+    if "__file__" not in globals():
+        raise NameError(
+            "__file__ not defined. This script might be running in an environment where __file__ is not available."
+        )
     repo_root = Path(__file__).resolve().parents[1]
     aide_config_template_path = repo_root / "environment" / "aide_config.yaml"
 
@@ -44,6 +56,9 @@ try:
 
 except FileNotFoundError as e:
     logging.error(f"Configuration file error: {e}")
+    sys.exit(1)
+except NameError as e:
+    logging.error(f"Could not determine aide_config_template_path: {e}")
     sys.exit(1)
 except ImportError:
     logging.error("PyYAML library not found. Please install it: `pip install PyYAML`")
@@ -86,7 +101,7 @@ def run_locally(
     run_dir: Path,
     port: int,  # Unique port for this run's grading server
     logger: logging.Logger,
-    main_logger=logging.Logger,
+    main_logger=logging.Logger,  # type: ignore
     retain_workspace: bool = False,
     seed: int = 0,
 ) -> Path:
@@ -103,6 +118,7 @@ def run_locally(
         run_dir: Path to the directory where all assets associated with the run are stored.
         port: The specific network port the grading server should listen on.
         logger: Logger instance for the run.
+        main_logger: Main logger from the calling process.
         retain_workspace: If True, the full temporary workspace is kept.
         seed: The seed number for this run.
 
@@ -171,95 +187,51 @@ def run_locally(
     ] = f"${{HOME_DIR}}/{simulated_public_data_dest.relative_to(ch).as_posix()}"  # e.g. ${HOME_DIR}/data
     # start.sh creates full_instructions.txt in AGENT_DIR
     aide_config_dict["desc_file"] = f"${{AGENT_DIR}}/full_instructions.txt"  # Match start.sh logic
-    # aide_config_dict["seed"] = seed
-    # --- 4. Create Symlinks for Submission Files ---
-    logger.info("Creating symlinks for submission files...")
-    workspaces_dir = ch / "workspaces"
-    logs_dir = ch / "logs"
 
-    # Create symlinks for each competition workspace
-    for workspace in workspaces_dir.iterdir():
-        if workspace.is_dir():
-            # Find the best submission file
-            best_submission = workspace / "best_submission" / "submission.csv"
-            if best_submission.exists():
-                # Create corresponding logs directory
-                log_subdir = logs_dir / workspace.name
-                log_subdir.mkdir(exist_ok=True)
-
-                # Create symlink
-                submission_link = log_subdir / "submission.csv"
-                if submission_link.exists():
-                    submission_link.unlink()
-                submission_link.symlink_to(best_submission)
-                logger.info(f"Created symlink: {submission_link} -> {best_submission}")
-
-    # --- 5. Run the Agent ---
+    # --- 5. Run the Agent (and related setup) ---
     try:
         # e (now partially updated) default config into key=value strings
         flattened_aide_config = flatten_dict(aide_config_dict)
         # Remove keys that start.sh already sets explicitly on the aide command line
-        # (like data_dir, desc_file, agent.code.model) to avoid duplicates or conflicts
-        keys_set_in_start_sh = ["data_dir", "desc_file", "agent.code.model"]  # Add others if needed
+        keys_set_in_start_sh = ["data_dir", "desc_file", "agent.code.model"]
         aide_cli_args = [
             f"{k}={v}"
             for k, v in flattened_aide_config.items()
-            if k not in keys_set_in_start_sh
-            and v != "null"  # Filter out keys handled by start.sh and nulls
+            if k not in keys_set_in_start_sh and v != "null"
         ]
 
-        # Convert agent.kwargs into key=value or --key value arguments
-        # These will override the YAML defaults if they have the same keys
         agent_override_args = []
         if agent.kwargs_type == "argparse":
             for key, value in agent.kwargs.items():
-                # Format as --key value
                 agent_override_args += [f"--{key}", str(value)]
         elif agent.kwargs_type == "omegaconf":
             for key, value in agent.kwargs.items():
-                # Format as key=value
                 agent_override_args += [f"{key}={value}"]
         else:
             logger.warning(
                 f"Unknown agent kwargs_type: {agent.kwargs_type}. Skipping passing agent.kwargs."
             )
 
-        # Add seed to agent arguments
-        if agent.kwargs_type == "argparse":
-            agent_override_args += ["--seed", str(seed)]
-        elif agent.kwargs_type == "omegaconf":
-            agent_override_args += [f"seed={seed}"]
-
-        # Combine default config args and agent override args
-        # Agent overrides should come LAST so they take precedence
         final_aide_args = aide_cli_args + agent_override_args
 
         # --- 6. Environment Variables Setup ---
-        env = os.environ.copy()  # Inherit environment from the parent process
-        env.setdefault("TIME_LIMIT_SECS", "3600")  # Set TIME_LIMIT_SECS as used by start.sh
+        env = os.environ.copy()
+        env.setdefault("TIME_LIMIT_SECS", "3600")
 
-        # Use hardcoded standard environment variable names and local simulated paths
         env.update(
             {
-                "HOME_DIR": str(ch),  # Local path to simulated /home
-                "SUBMISSION_DIR": str(
-                    ch / "submission"
-                ),  # Local path to simulated /home/submission
-                "LOGS_DIR": str(ch / "logs"),  # Local path to simulated /home/logs
-                "CODE_DIR": str(ch / "code"),  # Local path to simulated /home/code
-                "AGENT_DIR": str(ch / "agent"),  # Local path to simulated /home/agent
+                "HOME_DIR": str(ch),
+                "SUBMISSION_DIR": str(ch / "submission"),
+                "LOGS_DIR": str(ch / "logs"),
+                "CODE_DIR": str(ch / "code"),
+                "AGENT_DIR": str(ch / "agent"),
                 "COMPETITION_ID": competition.id,
-                "MBX_GRADE_PORT": str(
-                    port
-                ),  # Pass the assigned unique port via MBX_GRADE_PORT env var
-                "PRIVATE_DATA_DIR": str(
-                    simulated_private_data_root.resolve()
-                ),  # Local path to simulated /private
-                "SEED": str(seed),  # Pass the seed to the agent
+                "MBX_GRADE_PORT": str(port),
+                "PRIVATE_DATA_DIR": str(simulated_private_data_root.resolve()),
+                "SEED": str(seed),
             }
         )
 
-        # Ensure paths assigned to env vars are absolute and resolved
         for key in [
             "HOME_DIR",
             "SUBMISSION_DIR",
@@ -274,16 +246,19 @@ def run_locally(
                 except Exception as e:
                     logger.warning(f"Could not resolve path for env var {key}: {env[key]} - {e}")
 
-        # --- 7. Start Grading Server ---
-        logger.info(purple(f"Starting grading server on port {port}…"))
+        # --- 7. Start Grading Server & Run Agent ---
         server_log_path = work / "grading_server.log"
         server_log_file = None
         server = None
 
-        try:
+        try:  # This try is for server startup, agent run, symlink creation, and saving outputs
             server_log_file = server_log_path.open("w", encoding="utf-8")
-            repo_root = Path(__file__).resolve().parents[1]
-            server_script = repo_root / "environment" / "grading_server.py"
+            if "__file__" not in globals():
+                raise NameError("__file__ not defined for server script path.")
+            repo_root_server = (
+                Path(__file__).resolve().parents[1]
+            )  # Re-evaluate for safety if structure changes
+            server_script = repo_root_server / "environment" / "grading_server.py"
             assert server_script.exists(), f"Server script missing: {server_script}"
 
             logger.debug(
@@ -291,25 +266,25 @@ def run_locally(
             )
             server = subprocess.Popen(
                 [sys.executable, str(server_script), "--port", str(port)],
-                cwd=work,  # Server runs from the main run_dir
-                env=env,  # Pass the environment (might contain COMPETITION_ID etc. needed by server)
+                cwd=work,
+                env=env,
                 stdout=server_log_file,
                 stderr=subprocess.STDOUT,
                 text=True,
             )
 
-            # Wait for server to become ready
             ready = False
             logger.info(f"Waiting for server on port {port}...")
             timeout_seconds = 60
             start_time = time.monotonic()
             while time.monotonic() - start_time < timeout_seconds:
                 if server.poll() is not None:
-                    server_log_file.close()
-                    server_log = server_log_path.read_text(encoding="utf-8", errors="ignore")
+                    if server_log_file and not server_log_file.closed:
+                        server_log_file.close()
+                    server_log_text = server_log_path.read_text(encoding="utf-8", errors="ignore")
                     raise RuntimeError(
-                        f"Server exited unexpectedly (code {server.poll()}) on port {port}. Logs: {server_log[-1000:]}..."
-                    )  # Log last part of output
+                        f"Server exited unexpectedly (code {server.poll()}) on port {port}. Logs: {server_log_text[-1000:]}..."
+                    )
                 try:
                     import http.client
 
@@ -321,29 +296,25 @@ def run_locally(
                         break
                     conn.close()
                 except ConnectionRefusedError:
-                    pass  # Server not ready, keep looping
-                except Exception as e:
-                    logger.debug(f"Server check failed on port {port}: {e}. Retrying...")
+                    pass
+                except Exception as e_conn:
+                    logger.debug(f"Server check failed on port {port}: {e_conn}. Retrying...")
                 time.sleep(1)
 
             if not ready:
-                server_log_file.close()
-                server_log = server_log_path.read_text(encoding="utf-8", errors="ignore")
+                if server_log_file and not server_log_file.closed:
+                    server_log_file.close()
+                server_log_text = server_log_path.read_text(encoding="utf-8", errors="ignore")
                 raise RuntimeError(
-                    f"Server did not start on port {port} within {timeout_seconds}s. Logs: {server_log[-1000:]}..."
+                    f"Server did not start on port {port} within {timeout_seconds}s. Logs: {server_log_text[-1000:]}..."
                 )
-
             logger.info(purple(f"Grading server on port {port} is ready."))
 
             # --- 8. Run Agent Start Script ---
-            # This section is inside the main try block, after server starts
-            # Copy agent start.sh into its simulated directory (/home/agent)
             agent_src_dir = agent.agents_dir / agent.name
             start_script_name = "start.sh"
             start_script_src = agent_src_dir / start_script_name
-            start_script_dest = (
-                ch / "agent" / start_script_name
-            )  # Path within simulated /home/agent
+            start_script_dest = ch / "agent" / start_script_name
             logger.info(
                 f"Copying agent start script from {start_script_src} to {start_script_dest}"
             )
@@ -355,17 +326,12 @@ def run_locally(
                 )
 
             logger.info(purple("Running agent start.sh ..."))
-            # Pass the combined config and agent args directly to start.sh
-            # start.sh uses "$@" to pass these to the `aide` command.
-            logger.debug(
-                f"Running bash {start_script_dest} with CWD {ch}. Env: {env}. Args: {final_aide_args}"
-            )
-
-            agent_timeout = int(env.get("TIME_LIMIT_SECS", 3600))  # Use TIME_LIMIT_SECS env var
+            logger.debug(f"Running bash {start_script_dest} with CWD {ch}. Args: {final_aide_args}")
+            agent_timeout = int(env.get("TIME_LIMIT_SECS", 3600))
 
             result = subprocess.run(
-                ["bash", str(start_script_dest)] + final_aide_args,  # Pass the args here!
-                cwd=ch,  # Set CWD to simulated /home/
+                ["bash", str(start_script_dest)] + final_aide_args,
+                cwd=ch,
                 env=env,
                 text=True,
                 capture_output=True,
@@ -378,34 +344,68 @@ def run_locally(
             logger.info(result.stderr.strip() if result.stderr else "(empty)")
 
             if result.returncode != 0:
-                if result.returncode == 124:
+                if (
+                    result.returncode == 124
+                ):  # Timeout error code from `timeout` utility often used in bash scripts
                     raise TimeoutError(f"Agent timed out after {agent_timeout} seconds.")
                 else:
                     raise RuntimeError(f"Agent failed with exit code {result.returncode}.")
 
             logger.info(purple("Agent completed successfully."))
-            main_logger.info(
-                (purple(f"Agent completed successfully for competition {competition.id}."))
-            )
+            if main_logger:
+                main_logger.info(
+                    purple(f"Agent completed successfully for competition {competition.id}.")
+                )
+
+            # --- CREATE/FIX SYMLINKS POST-AGENT-RUN ---
+            logger.info("Creating/Fixing symlinks for submission files post-agent-run...")
+            post_agent_workspaces_dir = ch / "workspaces"  # Agent should have populated this
+            post_agent_logs_dir = ch / "logs"
+
+            for workspace in post_agent_workspaces_dir.iterdir():
+                if workspace.is_dir():
+                    best_submission = workspace / "best_submission" / "submission.csv"
+                    if best_submission.exists():
+                        log_subdir = post_agent_logs_dir / workspace.name
+                        log_subdir.mkdir(exist_ok=True)
+                        submission_link = log_subdir / "submission.csv"
+
+                        if submission_link.exists():
+                            if submission_link.is_symlink():
+                                logger.debug(f"Removing existing symlink: {submission_link}")
+                                submission_link.unlink()
+                            else:
+                                logger.warning(
+                                    f"File {submission_link} exists and is not a symlink. Removing to create new symlink."
+                                )
+                                submission_link.unlink()  # Or os.remove(submission_link) if not a dir
+
+                        relative_target_path = os.path.relpath(
+                            best_submission.resolve(), start=submission_link.parent.resolve()
+                        )
+                        submission_link.symlink_to(relative_target_path)
+                        logger.info(
+                            f"Created/Updated symlink: {submission_link} -> {relative_target_path} (points to {best_submission.resolve()})"
+                        )
+                    else:
+                        logger.warning(
+                            f"Expected submission file not found at {best_submission} after agent run for workspace {workspace.name}."
+                        )
+
             # --- 9. Save Selected Outputs ---
-            # This section is inside the main try block, after agent finishes
             if not retain_workspace:
                 logger.info("Saving selected outputs...")
-                # Define paths to save *from* the simulated home directories
-                # These are already Path objects
                 items_to_save = {
                     "submission": ch / "submission",
-                    "logs": ch / "logs",
+                    "logs": ch / "logs",  # Now contains corrected symlinks
                     "code": ch / "code",
-                    "wandb": ch / "wandb",  # Assuming wandb is created under /home
-                    "workspaces": ch / "workspaces",
+                    "wandb": ch / "wandb",
+                    "workspaces": ch / "workspaces",  # Contains the actual submission files
                 }
 
                 for name, src_path in items_to_save.items():
-                    dest_path = (
-                        work / name
-                    )  # Save to /path/to/run/submission, /path/to/run/logs etc. (root of work dir)
-                    if src_path.exists():  # Now src_path is a Path object, .exists() works
+                    dest_path = work / name
+                    if src_path.exists():
                         try:
                             logger.info(f"Saving '{name}' from '{src_path}' to '{dest_path}'")
                             if dest_path.exists():
@@ -413,119 +413,106 @@ def run_locally(
                                     shutil.rmtree(dest_path)
                                 else:
                                     os.remove(dest_path)
-                            shutil.move(src_path, dest_path)
-                        except Exception as e:
-                            logger.error(f"Error saving '{name}': {e}")
+                            shutil.move(
+                                str(src_path), str(dest_path)
+                            )  # Ensure strings for older shutil
+                        except Exception as e_save:
+                            logger.error(f"Error saving '{name}': {e_save}")
                     else:
-                        logger.debug(
-                            f"Source directory for '{name}' not found: '{src_path}'. Skipping save."
-                        )
+                        logger.debug(f"Source for '{name}' not found: '{src_path}'. Skipping save.")
 
             logger.info(purple("Run completed."))
-            main_logger.info(purple("Run completed."))
-
+            if main_logger:
+                main_logger.info(purple(f"Run completed for competition {competition.id}."))
             return work
 
-        except Exception as e:
-            # This catches errors from server startup, agent run, or saving
-            logger.error(purple(f"Run failed: {type(e).__name__}: {e}"))
+        except Exception as e_inner:  # Catches errors from server startup, agent run, symlinks, saving
+            logger.error(purple(f"Inner run block failed: {type(e_inner).__name__}: {e_inner}"))
             logger.error(traceback.format_exc())
-            raise e
+            raise e_inner  # Re-raise to be caught by outer try-except if necessary, or handled by caller
 
         finally:
-            # --- 10. Cleanup Temporary Workspace ---
-            # This block runs regardless of success or failure
-
-            # Ensure server is stopped first
+            # --- 10. Cleanup Server and Potentially Workspace ---
             if server and server.poll() is None:
                 logger.info(f"Stopping grading server on port {port}...")
                 try:
                     server.terminate()
                     server.wait(timeout=10)
-                except Exception as e:
-                    logger.error(f"Error during server shutdown on port {port}: {e}")
-
+                except Exception as e_server_stop:
+                    logger.error(f"Error during server shutdown on port {port}: {e_server_stop}")
             if server_log_file and not server_log_file.closed:
                 try:
                     server_log_file.close()
-                except Exception as e:
-                    logger.error(f"Error closing server log: {e}")
+                except Exception as e_log_close:
+                    logger.error(f"Error closing server log: {e_log_close}")
 
             if not retain_workspace:
-                logger.info(f"Cleaning up temporary workspace in: {work}")
-                # Define items that should *remain* in the main run_dir
-                items_to_keep_resolved = {
-                    (work / "run.log").resolve(),
-                    (work / "grading_server.log").resolve(),
-                    # Saved items that should now be at the root of work
-                    (work / "submission").resolve(),
-                    (work / "logs").resolve(),
-                    (work / "code").resolve(),
-                    (work / "wandb").resolve(),  # Ensure wandb is included if it might be saved
-                    (
-                        work / "workspaces"
-                    ).resolve(),  # Ensure wandb is included if it might be saved
-                }
-                # Filter the set to only include paths that actually exist after saving attempts
-                items_to_keep_resolved = {item for item in items_to_keep_resolved if item.exists()}
-                try:
-                    # Iterate through *all* items in the main run_dir (work)
-                    for item in list(
-                        work.iterdir()
-                    ):  # Use list() to avoid issues while deleting during iteration
-                        if item.resolve() not in items_to_keep_resolved:
-                            logger.debug(f"Removing temporary item: {item}")
-                            try:
-                                if item.is_dir():
-                                    shutil.rmtree(item)
-                                else:
-                                    os.remove(item)
-                            except Exception as item_e:
-                                logger.error(f"Error removing {item}: {item_e}")
+                logger.info(f"Cleaning up temporary workspace components in: {work}")
+                # Items that were explicitly moved to `work` or are logs should remain.
+                # `ch` and `simulated_private_data_root` are the main temporary structures to remove.
 
-                    workspaces = (work / "workspaces").resolve()
+                # Remove simulated '/home' if it wasn't moved entirely and still exists
+                if (
+                    ch.exists() and ch.is_relative_to(work) and (work / ch.name).exists()
+                ):  # Check if ch itself is still there (e.g. if retain_workspace=True previously)
+                    logger.debug(f"Removing simulated home directory contents: {ch}")
 
-                    for input_dir in workspaces.glob("*/input"):
-                        if input_dir.is_dir():
-                            logger.info(f"Removing temporary item: {input_dir}")
-                            shutil.rmtree(input_dir, ignore_errors=True)
-
-                    # These are the top-level temporary folders we created
-                    if ch.exists():  # The simulated '/home' directory
-                        logger.debug(f"Removing simulated home directory: {ch}")
-                        try:
-                            shutil.rmtree(ch)
-                        except Exception as e:
-                            logger.error(f"Error removing simulated home {ch}: {e}")
-
-                    # The simulated '/private' directory (containing private data)
-                    simulated_private_data_root = (
-                        work / "private"
-                    )  # Re-define path for clarity in cleanup
-                    if simulated_private_data_root.exists():
+                    # Remove the simulated '/home' directory structure if it's still under `work`
+                    # This path was work / "home"
+                    simulated_home_to_remove = work / "home"
+                    if simulated_home_to_remove.exists():
                         logger.debug(
-                            f"Removing simulated private data root: {simulated_private_data_root}"
+                            f"Removing full simulated home directory: {simulated_home_to_remove}"
                         )
                         try:
-                            shutil.rmtree(simulated_private_data_root)
-                        except Exception as e:
+                            shutil.rmtree(simulated_home_to_remove)
+                        except Exception as e_rm_home:
                             logger.error(
-                                f"Error removing simulated private data {simulated_private_data_root}: {e}"
+                                f"Error removing simulated home {simulated_home_to_remove}: {e_rm_home}"
                             )
 
-                    logger.info("Temporary workspace cleanup complete.")
-                except Exception as e:
-                    logger.error(
-                        purple(
-                            f"An unexpected error occurred during workspace cleanup: {e}. Manual cleanup may be required for {work}"
-                        )
+                # Remove simulated '/private'
+                if simulated_private_data_root.exists():
+                    logger.debug(
+                        f"Removing simulated private data root: {simulated_private_data_root}"
                     )
+                    try:
+                        shutil.rmtree(simulated_private_data_root)
+                    except Exception as e_rm_private:
+                        logger.error(
+                            f"Error removing simulated private data {simulated_private_data_root}: {e_rm_private}"
+                        )
 
-            else:
+                # Specific cleanup for items not caught by moving `ch` subdirectories
+                # e.g. if `ch/agent` was not in `items_to_save`
+                if (work / "home" / "agent").exists():
+                    shutil.rmtree(work / "home" / "agent", ignore_errors=True)
+
+                # Clean up any remaining empty directories or specific files in work if necessary,
+                # but the `items_to_keep_resolved` logic from the original script was more for when
+                # `ch` itself was the main `work` directory. Here `work` is the parent.
+                # The main cleanup is `work/"home"` and `work/"private"`.
+                logger.info("Temporary workspace component cleanup attempt complete.")
+
+            else:  # if retain_workspace is True
                 logger.info(f"Retaining full workspace: {work}")
+                # Even if retaining, the symlinks should now be relative and robust
+                # within the work/logs and work/workspaces structure if they were moved.
+                # If they were not moved (i.e. ch/logs, ch/workspaces are still there),
+                # the relative symlinks will work within ch.
 
-    except Exception as e:
-        # This catches errors from server startup, agent run, or saving
-        logger.error(purple(f"Run failed: {type(e).__name__}: {e}"))
+    except Exception as e_outer:  # Catches errors from pre-agent setup or re-raised from inner block
+        logger.error(purple(f"Outer run_locally failed: {type(e_outer).__name__}: {e_outer}"))
         logger.error(traceback.format_exc())
-        raise e
+        # Ensure cleanup is attempted even if outer setup fails, though server might not be running.
+        # The `finally` block for server/workspace cleanup is tied to the inner `try`.
+        # If failure is before server `try`, that `finally` won't run.
+        # However, primary cleanup candidates (ch, private_data_root) are created early.
+        if not retain_workspace:
+            if ch.exists():
+                shutil.rmtree(ch, ignore_errors=True)
+            if simulated_private_data_root.exists():
+                shutil.rmtree(simulated_private_data_root, ignore_errors=True)
+        raise e_outer
+
+    return work  # Should return work whether successful or if retain_workspace is true on failure.

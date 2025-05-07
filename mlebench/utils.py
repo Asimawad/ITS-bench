@@ -100,23 +100,24 @@ def get_repo_dir() -> Path:
     return get_module_dir().parent
 
 
-def generate_run_id(competition_id: str, agent_id: str, run_group: Optional[str] = None) -> str:
+def generate_run_id(
+    competition_id: str, agent_id: str, run_group: Optional[str] = None, seed: int = 0
+) -> str:
     """Creates a unique run ID for a specific competition and agent combo"""
 
     timestamp = get_timestamp()
-    long_id = str(uuid.uuid4())
-    short_id = long_id[:8]
 
     if run_group:  # the timestamp and agent are already included in the run group name
-        return f"{competition_id}_{long_id}"
+        return f"{competition_id}_seed_{seed}"
 
-    return f"{timestamp}_{competition_id}_{agent_id}_{short_id}"
+    return f"{timestamp}_{competition_id}_{agent_id}_seed_{seed}"
 
 
 def create_run_dir(
     competition_id: Optional[str] = None,
     agent_id: Optional[str] = None,
     run_group: Optional[str] = None,
+    seed: int = 0,
 ) -> Path:
     """Creates a directory for the run."""
 
@@ -135,7 +136,7 @@ def create_run_dir(
     run_id = str(uuid.uuid4())
 
     if competition_id and agent_id:
-        run_id = generate_run_id(competition_id, agent_id, run_group)
+        run_id = generate_run_id(competition_id, agent_id, run_group, seed)
 
     run_dir = get_runs_dir() / run_id
 

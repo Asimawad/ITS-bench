@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-def find_submission_paths(run_dir: Path) -> list:
+def find_submission_paths(run_dir: Path, seed: int) -> list:
     """Find all submission.csv files in a specific run directory."""
     paths = []
 
@@ -13,11 +13,11 @@ def find_submission_paths(run_dir: Path) -> list:
     for comp_dir in run_dir.iterdir():
         if not comp_dir.is_dir():
             continue
-
+        comp_dir_data = comp_dir.name.split("_")
         # Extract competition ID from folder name (before the underscore)
-        if "_" in comp_dir.name:
-            competition_id = comp_dir.name.split("_")[0]
-            print(f"Competition ID: {competition_id}")
+        if "_" in comp_dir.name and comp_dir_data[2] == str(seed):
+            competition_id = comp_dir_data[0]
+            print(f"Competition ID: {competition_id} seed: {seed}")
 
             # Look for submission.csv only in the logs directory
             logs_dir = comp_dir / "logs"
@@ -54,6 +54,7 @@ def main():
         description="Generate submission paths JSONL for a specific run"
     )
     parser.add_argument("--run", type=str, help="Path to specific run directory (optional)")
+    parser.add_argument("--seeds", type=str, help="Seed numbers like this: '0 1' (optional)")
     args = parser.parse_args()
 
     runs_dir = Path("runs")
@@ -66,17 +67,25 @@ def main():
     else:
         run_dir = get_latest_run(runs_dir)
         print(f"Using latest run: {run_dir.name}")
+    if args.seeds:
+        seeds = args.seeds
+        seeds = [int(s) for s in args.seeds.split()]  # This will split '0 1' into [0, 1]
+    else:
+        seeds = [0]
+    for seed in seeds:
+        # Find submission paths for this run
+        paths = find_submission_paths(run_dir, seed)
 
-    # Find submission paths for this run
-    paths = find_submission_paths(run_dir)
+        # Write to JSONL file for each seed inside the run directory
+        output_file = run_dir / f"submission_paths_seed_{seed}.jsonl"
+        if len(paths) > 0:
+            with open(output_file, "w") as f:
+                for path in paths:
+                    f.write(json.dumps(path) + "\n")
 
-    # Write to JSONL file inside the run directory
-    output_file = run_dir / "submission_paths.jsonl"
-    with open(output_file, "w") as f:
-        for path in paths:
-            f.write(json.dumps(path) + "\n")
-
-    print(f"Found {len(paths)} submissions. Written to {output_file}")
+            print(f"Found {len(paths)} submissions for seed {seed}. Written to {output_file}")
+        else:
+            print(f"No submissions found for seed {seed}")
 
 
 if __name__ == "__main__":

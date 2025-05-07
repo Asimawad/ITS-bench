@@ -161,7 +161,36 @@ def main(args):
 
     # Using multiprocessing Pool to process tasks in parallel
     with multiprocessing.Pool(processes=args.n_workers) as pool:
-        results = pool.map(worker_process, tasks)
+        # Use map_async instead of map for better error handling
+        async_results = pool.map_async(worker_process, tasks)
+
+        # Wait for all tasks to complete and get results
+        try:
+            results = async_results.get()
+        except Exception as e:
+            logger.error(f"Some tasks failed: {e}")
+            # Get the results that completed successfully
+            results = []
+            for i, task in enumerate(tasks):
+                try:
+                    result = async_results.get(i)
+                    results.append(result)
+                except Exception as task_e:
+                    logger.error(f"Task {task.run_id} failed: {task_e}")
+                    # Add a failed result for this task
+                    results.append(
+                        (
+                            task.run_id,
+                            {
+                                "success": False,
+                                "error": {
+                                    "type": type(task_e).__name__,
+                                    "message": str(task_e),
+                                    "stack_trace": traceback.format_exc(),
+                                },
+                            },
+                        )
+                    )
 
     # Collect the results and handle output
     tasks_outputs = {}
@@ -179,7 +208,10 @@ def main(args):
     with open(run_group_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=4, sort_keys=False, default=str)
 
-    logger.info(f"{args.n_workers} workers ran for tasks in total")
+    # Log summary of results
+    successful_runs = sum(1 for output in tasks_outputs.values() if output.get("success", False))
+    failed_runs = len(tasks_outputs) - successful_runs
+    logger.info(f"Run group completed: {successful_runs} successful, {failed_runs} failed")
 
 
 if __name__ == "__main__":
