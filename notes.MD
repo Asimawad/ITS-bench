@@ -469,3 +469,9 @@ The evaluation metrics include:
 4. Proper aggregation and reporting of results
 
 mlebench grade --submission runs/2025-05-06T17-22-48-GMT_run-group_aide-deepseek/submission_paths.jsonl --output-dir evaluation_results
+python scripts/aggregate_competition_metrics.py --seed all
+
+
+mlebench grade --submission runs/2025-05-07T13-09-10-GMT_run-group_aide-deepseek/submission_paths_seed_all.jsonl  --output-dir output --data-dir lite_dataset 
+
+python scripts/generate_submission_paths.py --seeds all

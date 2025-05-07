@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-def find_submission_paths(run_dir: Path, seed: int) -> list:
+def find_submission_paths(run_dir: Path, seed, all_seeds=False) -> list:
     """Find all submission.csv files in a specific run directory."""
     paths = []
 
@@ -15,7 +15,7 @@ def find_submission_paths(run_dir: Path, seed: int) -> list:
             continue
         comp_dir_data = comp_dir.name.split("_")
         # Extract competition ID from folder name (before the underscore)
-        if "_" in comp_dir.name and comp_dir_data[2] == str(seed):
+        if "_" in comp_dir.name and (comp_dir_data[2] == str(seed) or all_seeds):
             competition_id = comp_dir_data[0]
             print(f"Competition ID: {competition_id} seed: {seed}")
 
@@ -67,14 +67,22 @@ def main():
     else:
         run_dir = get_latest_run(runs_dir)
         print(f"Using latest run: {run_dir.name}")
+    cal_all = False
     if args.seeds:
-        seeds = args.seeds
-        seeds = [int(s) for s in args.seeds.split()]  # This will split '0 1' into [0, 1]
+        if args.seeds == "all":
+            seeds = ["all"]
+            cal_all = True
+        else:
+            seeds = [int(s) for s in args.seeds.split()]  # This will split '0 1' into [0, 1]
     else:
         seeds = [0]
+
     for seed in seeds:
         # Find submission paths for this run
-        paths = find_submission_paths(run_dir, seed)
+        if cal_all:
+            paths = find_submission_paths(run_dir, seed, all_seeds=True)
+        else:
+            paths = find_submission_paths(run_dir, seed)
 
         # Write to JSONL file for each seed inside the run directory
         output_file = run_dir / f"submission_paths_seed_{seed}.jsonl"
