@@ -1,3 +1,0 @@
-random-acts-of-pizza
-text-normalization-challenge-english-language
-text-normalization-challenge-russian-language

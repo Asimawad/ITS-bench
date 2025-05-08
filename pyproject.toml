@@ -32,10 +32,13 @@ dependencies = [
   "pyquaternion>=0.9.9",
   "shapely>=2.0.5",
   "ruff>=0.9.10",
+  "flask>=2.3",
+  "werkzeug>=2.3",
+  "python-dotenv==1.0.1",
   "git-lfs",
   "s3fs",
-  "flask>=2.3",
-  "werkzeug>=2.3"
+  "pyyaml",
+  "tqdm",
 ]
 
 [tool.setuptools]

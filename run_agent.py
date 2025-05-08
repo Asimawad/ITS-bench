@@ -95,25 +95,66 @@ def worker_process(task: Task):
 
 
 def zip_and_upload_runs(every_minutes: int = 10):
+    """
+    Periodically zips the runs directory and uploads it to S3 for checkpointing.
+    Uses make_filtered_zip to exclude large data directories.
+
+    Args:
+        every_minutes: How often to checkpoint in minutes
+    """
+
     def task():
-        i = 1
+        logger.info(f"Starting checkpointing thread (every {every_minutes} minutes)")
+
+        checkpoint_counter = 1
+        checkpoint_dir = Path("checkpoints")
+        checkpoint_dir.mkdir(exist_ok=True)
+
         while True:
-            time.sleep(every_minutes * 60)
-            timestamp = f"{i * every_minutes}min"
-            zip_name = f"runs_{timestamp}.zip"
-            zip_path = Path(zip_name)
+            try:
+                time.sleep(every_minutes * 60)
 
-            # Zip the `runs/` folder
-            # shutil.make_archive(zip_path.stem, "zip", "runs")
-            make_filtered_zip(zip_path, "runs")
+                # Skip if runs directory doesn't exist yet
+                if not os.path.isdir("runs"):
+                    logger.warning("Checkpoint skipped: 'runs' directory does not exist yet")
+                    continue
 
-            # Upload (reuse your logic here)
-            upload_to_s3(zip_path, f"{os.environ['AICHOR_OUTPUT_PATH'].rstrip('/')}/{zip_name}")
-            # upload_to_local(zip_path)
-            logger.info(f"[Checkpoint] Uploaded {zip_name} to output bucket")
-            i += 1
+                # Create timestamp for the checkpoint
+                timestamp = get_timestamp()
+                checkpoint_name = f"checkpoint_{timestamp}_{checkpoint_counter:03d}"
+                checkpoint_file = checkpoint_dir / f"{checkpoint_name}.zip"
 
-    threading.Thread(target=task, daemon=True).start()
+                logger.info(
+                    f"[Checkpoint] Creating checkpoint {checkpoint_counter}: {checkpoint_file}"
+                )
+
+                # Zip the runs folder with filtering (excludes data/input dirs)
+                result_path = make_filtered_zip(checkpoint_file, "runs")
+
+                # Check if Aichor environment variables are available for S3 upload
+                if "AICHOR_OUTPUT_PATH" in os.environ and "S3_ENDPOINT" in os.environ:
+                    # Upload to S3
+                    remote_key = f"{os.environ['AICHOR_OUTPUT_PATH'].rstrip('/')}/checkpoints/{checkpoint_name}.zip"
+                    upload_to_s3(result_path, remote_key)
+                    logger.info(f"[Checkpoint] Uploaded {checkpoint_file} to {remote_key}")
+                else:
+                    logger.info(f"[Checkpoint] Created local checkpoint: {checkpoint_file}")
+                    logger.warning(
+                        "S3 upload skipped: AICHOR_OUTPUT_PATH environment variable not set"
+                    )
+
+                # Increment counter for next checkpoint
+                checkpoint_counter += 1
+
+            except Exception as e:
+                logger.error(f"[Checkpoint] Error during checkpointing: {str(e)}")
+                logger.error(traceback.format_exc())
+                # Continue the loop even after error
+
+    # Start the checkpointing thread as daemon (will exit when main thread exits)
+    checkpoint_thread = threading.Thread(target=task, daemon=True)
+    checkpoint_thread.start()
+    return checkpoint_thread
 
 
 def main(args):
@@ -123,6 +164,13 @@ def main(args):
     agent = agent_registry.get_agent(args.agent_id)
 
     run_group = f"{get_timestamp()}_run-group_{agent.name}"
+
+    # Start the checkpointing thread
+    if args.enable_checkpoints:
+        logger.info(f"Enabling automatic checkpointing every {args.checkpoint_interval} minutes")
+        checkpoint_thread = zip_and_upload_runs(every_minutes=args.checkpoint_interval)
+    else:
+        logger.info("Automatic checkpointing is disabled")
 
     # Load competition ids and check if all are prepared
     with open(args.competition_set, "r") as f:
@@ -243,7 +291,18 @@ if __name__ == "__main__":
         default=1,
         help="Number of seeds to run for each competition",
     )
-
+    parser.add_argument(
+        "--enable-checkpoints",
+        action="store_true",
+        help="Enable automatic checkpointing of runs directory",
+        default=True,
+    )
+    parser.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=10,
+        help="How often to checkpoint in minutes",
+    )
     parser.add_argument(
         "--retain",
         help="Whether to retain the container after the run instead of removing it.",
@@ -267,6 +326,5 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     logger = get_logger(__name__)
-    # zip_and_upload_runs(every_minutes=10)
 
     main(args)

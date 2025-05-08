@@ -231,7 +231,7 @@ def is_empty(dir: Path) -> bool:
 def get_logger(name: str, level: int = logging.INFO, filename: Optional[Path] = None) -> Logger:
     logging.basicConfig(
         level=level,
-        format="[%(asctime)s] [%(levelname)s] [%(process)d] [%(filename)s:%(lineno)d] [%(name)s] %(message)s",
+        format="[%(asctime)s] [%(name)s] %(message)s",
         filename=filename,
     )
     return logging.getLogger(name)
