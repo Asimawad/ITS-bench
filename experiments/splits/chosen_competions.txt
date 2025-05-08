@@ -1,3 +1,4 @@
+leaf-classification
 random-acts-of-pizza
-spooky-author-identification
-aerial-cactus-identification
+nomad2018-predict-transparent-conductors
+denoising-dirty-documents

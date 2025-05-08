@@ -3,11 +3,17 @@ import json
 import logging
 import multiprocessing
 import os
+import random
+import sys
 import threading
 import time
 import traceback
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+
+import psutil
 
 from agents.registry import Agent
 from agents.registry import registry as agent_registry
@@ -18,9 +24,16 @@ from environment.utils_zip import make_filtered_zip
 # from agents.run import run_in_container, run_locally
 from mlebench.data import is_dataset_prepared
 from mlebench.registry import Competition, registry
-from mlebench.utils import create_run_dir, get_logger, get_runs_dir, get_timestamp
+from mlebench.utils import create_run_dir, get_logger, get_runs_dir, get_timestamp, purple
 
 logger = get_logger(__name__)
+
+# Create a handler that logs to stdout for immediate feedback during parallel execution
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(process)d] %(levelname)s %(name)s - %(message)s")
+)
+logging.getLogger().addHandler(stdout_handler)
 
 
 @dataclass(frozen=True)
@@ -31,27 +44,104 @@ class Task:
     path_to_run: Path
     agent: Agent
     competition: Competition
-    port: int  # Add this line
+    port: int  # Unique port for this run's grading server
+    retry_count: int = 0  # Track how many times this task has been retried
 
 
 def worker_process(task: Task):
-    # Same logic for running a task, but now in a separate process
-    run_logger = get_logger(str(task.path_to_run))
-    log_file_handler = logging.FileHandler(task.path_to_run / "run.log")
-    log_file_handler.setFormatter(logging.getLogger().handlers[0].formatter)
-    run_logger.addHandler(log_file_handler)
+    """
+    Worker process that runs a single task. Enhanced with robust logging, heartbeats, and exception handling.
+
+    Args:
+        task (Task): The task to run.
+
+    Returns:
+        tuple: (run_id, task_output) where task_output contains success status and error details if applicable
+    """
+    process_id = os.getpid()
+    start_time = time.time()
+    heartbeat_interval = 60  # Log a heartbeat every minute
+    last_heartbeat = start_time
+    task_output = {
+        "success": False,
+        "error": None,
+        "process_id": process_id,
+        "retry_count": task.retry_count,
+    }
+
+    # Create and configure run-specific logger
+    run_logger = get_logger(f"{task.run_id}_{process_id}")
+    run_logger.setLevel(logging.INFO)
+
+    # Create log directory if it doesn't exist
+    task.path_to_run.mkdir(parents=True, exist_ok=True)
+    log_file_path = task.path_to_run / "run.log"
+
+    # For retries, rename the existing log file instead of overwriting
+    if task.retry_count > 0 and log_file_path.exists():
+        old_log_file = task.path_to_run / f"run.log.attempt{task.retry_count - 1}"
+        try:
+            log_file_path.rename(old_log_file)
+            run_logger.info(f"Previous log file moved to {old_log_file}")
+        except Exception as e:
+            run_logger.warning(f"Failed to rename previous log file: {e}")
+
+    # Add file handler
+    file_handler = logging.FileHandler(log_file_path)
+    file_formatter = logging.Formatter("%(asctime)s [PID:%(process)d] %(levelname)s - %(message)s")
+    file_handler.setFormatter(file_formatter)
+    run_logger.addHandler(file_handler)
+
+    # Also add a stream handler to see logs in real-time
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(file_formatter)
+    run_logger.addHandler(stream_handler)
+
+    # Prevent propagation to avoid duplicate logs
     run_logger.propagate = False
 
-    run_logger.info(
-        f"Starting task - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
-    )
-
-    logger.info(
-        f"Starting task - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
-    )
-    task_output = {}
     try:
+        # Log worker start with detailed information
+        run_logger.info(f"=== WORKER STARTED [PID:{process_id}] ===")
+        if task.retry_count > 0:
+            run_logger.info(f"*** RETRY ATTEMPT #{task.retry_count} ***")
+        run_logger.info(
+            f"Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
+        )
+        run_logger.info(f"Run directory: {task.path_to_run}")
+
+        # Log system resource info at start
+        memory_info = psutil.virtual_memory()
+        run_logger.info(
+            f"System memory: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
+        )
+
+        # Run the task with periodic heartbeats
+        def heartbeat_callback():
+            nonlocal last_heartbeat
+            current_time = time.time()
+            if current_time - last_heartbeat >= heartbeat_interval:
+                last_heartbeat = current_time
+                elapsed_minutes = (current_time - start_time) / 60
+                memory_info = psutil.virtual_memory()
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                run_logger.info(
+                    f"HEARTBEAT - Task running for {elapsed_minutes:.1f} minutes - CPU: {cpu_percent}%, Mem: {memory_info.percent}%"
+                )
+                # Flush logs to ensure they're written
+                for handler in run_logger.handlers:
+                    handler.flush()
+
+        # Call the run_locally function with heartbeat and enhanced logging
         run_logger.info(f"Initializing environment for task...")
+        heartbeat_callback()  # Initial heartbeat
+
+        # Set a more aggressive no-output timeout based on retry count
+        # First attempt: 15 minutes, Second: 10 minutes, Third+: 5 minutes
+        no_output_timeout = max(5, 15 - (task.retry_count * 5))
+        run_logger.info(f"Setting no-output timeout to {no_output_timeout} minutes")
+
+        # Run the task with custom logger
         run_locally(
             competition=task.competition,
             agent=task.agent,
@@ -60,36 +150,112 @@ def worker_process(task: Task):
             main_logger=logger,
             port=task.port,
             seed=task.seed,
-        )
-        task_output["success"] = True
-
-        run_logger.info(
-            f"Task completed successfully - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
+            heartbeat_callback=heartbeat_callback,  # Pass the heartbeat callback
+            no_output_timeout_mins=no_output_timeout,  # Pass configurable timeout
         )
 
+        # Task completed successfully
+        elapsed_time = time.time() - start_time
+        run_logger.info(purple(f"Task completed successfully in {elapsed_time:.2f} seconds"))
         logger.info(
-            f"Task completed successfully - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
+            purple(
+                f"Task completed successfully - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
+            )
         )
+
+        task_output["success"] = True
+        task_output["elapsed_time"] = elapsed_time
+
+    except KeyboardInterrupt:
+        run_logger.error("Task interrupted by user")
+        task_output["error"] = {
+            "type": "KeyboardInterrupt",
+            "message": "Task was interrupted by user",
+            "stack_trace": traceback.format_exc(),
+            "retry_suggested": False,  # Don't retry on manual interruption
+        }
+
+    except TimeoutError as e:
+        run_logger.error(f"Task timed out: {e}")
+        task_output["error"] = {
+            "type": "TimeoutError",
+            "message": str(e),
+            "stack_trace": traceback.format_exc(),
+            "retry_suggested": True,  # Retry on timeout
+        }
+
     except Exception as e:
         stack_trace = traceback.format_exc()
         run_logger.error(f"Task failed with error type: {type(e).__name__}")
         run_logger.error(f"Error details: {str(e)}")
         run_logger.error(f"Stack trace:\n{stack_trace}")
-        run_logger.error(
-            f"Task failed - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
-        )
-        logger.error(f"Task failed with error type: {type(e).__name__}")
-        logger.error(f"Error details: {str(e)}")
-        logger.error(f"Stack trace:\n{stack_trace}")
-        logger.error(
-            f"Task failed - Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}"
-        )
-        task_output["success"] = False
+
+        # Log additional system info for debugging
+        try:
+            memory_info = psutil.virtual_memory()
+            run_logger.error(
+                f"System memory at failure: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
+            )
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            run_logger.error(f"CPU usage at failure: {cpu_percent}%")
+        except Exception as e_info:
+            run_logger.error(f"Failed to get system info: {e_info}")
+
+        # Determine if this error should be retried
+        # Generally retry network, resource, and timeout issues
+        retry_error_types = [
+            "ConnectionError",
+            "TimeoutError",
+            "ResourceError",
+            "MemoryError",
+            "RuntimeError",
+            "OSError",
+            "IOError",
+        ]
+        retry_suggested = any(err_type in type(e).__name__ for err_type in retry_error_types)
+
+        # Also suggest retry if error message contains specific keywords
+        retry_keywords = ["timeout", "connection", "reset", "refused", "failed", "hang", "deadlock"]
+        if not retry_suggested:
+            retry_suggested = any(keyword in str(e).lower() for keyword in retry_keywords)
+
         task_output["error"] = {
             "type": type(e).__name__,
             "message": str(e),
             "stack_trace": stack_trace,
+            "retry_suggested": retry_suggested,
         }
+
+    finally:
+        # Always log completion and clean up resources
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        task_output["elapsed_time"] = elapsed_time
+
+        run_logger.info(
+            f"=== WORKER FINISHED [PID:{process_id}] === (elapsed: {elapsed_time:.2f}s)"
+        )
+
+        # Ensure all logs are flushed before returning
+        for handler in run_logger.handlers:
+            handler.flush()
+            handler.close()
+            run_logger.removeHandler(handler)
+
+        # Write a completion marker file to indicate this process finished (even if with error)
+        try:
+            completion_marker = task.path_to_run / f"process_{process_id}_completed.txt"
+            with open(completion_marker, "w") as f:
+                f.write(f"Process completed at {datetime.now().isoformat()}\n")
+                f.write(f"Success: {task_output['success']}\n")
+                f.write(f"Retry attempt: {task.retry_count}\n")
+                if task_output["error"]:
+                    f.write(
+                        f"Error: {task_output['error']['type']} - {task_output['error']['message']}\n"
+                    )
+        except Exception as e_marker:
+            # If we can't write the marker, log it but don't fail
+            print(f"Failed to write completion marker: {e_marker}")
 
     return task.run_id, task_output
 
@@ -157,6 +323,16 @@ def zip_and_upload_runs(every_minutes: int = 10):
     return checkpoint_thread
 
 
+def init_worker():
+    """
+    Initializes worker process. This helps handle keyboard interrupts properly.
+    """
+    # Handle signals at process level
+    import signal
+
+    signal.signal(signal.SIGINT, signal.SIG_IGN)  # Ignore keyboard interrupt in worker processes
+
+
 def main(args):
     global registry
     registry = registry.set_data_dir(Path(args.data_dir))
@@ -183,14 +359,36 @@ def main(args):
 
     # Create tasks for each competition and seed
     logger.info(f"Launching run group: {run_group}")
-    tasks = []
-    base_port = 5000  # Or make this configurable
-    task_index = 0
+
+    # Tasks to run initially
+    initial_tasks = []
+    # Port range to use - ensure we have enough for all tasks and retries
+    base_port = args.base_port if hasattr(args, "base_port") and args.base_port else 5000
+    max_retries = args.max_retries if hasattr(args, "max_retries") else 3
+
+    # Calculate how many ports we need in total (including possible retries)
+    total_possible_tasks = len(competition_ids) * args.n_seeds * (max_retries + 1)
+    logger.info(
+        f"Reserving ports {base_port} to {base_port + total_possible_tasks - 1} for tasks and retries"
+    )
+
+    # Port assignment function - gives each task a deterministic port even after retries
+    def get_port_for_task(comp_id, seed, retry_count=0):
+        # Create a deterministic "task index" based on competition and seed
+        comp_idx = competition_ids.index(comp_id)
+        task_idx = comp_idx * args.n_seeds + seed
+        # Add retry offset
+        port = base_port + task_idx * (max_retries + 1) + retry_count
+        return port
+
+    # Create initial task list
     for seed in range(args.n_seeds):
         for competition_id in competition_ids:
             competition = registry.get_competition(competition_id)
             run_dir = create_run_dir(competition.id, agent.id, run_group, seed)
             run_id = run_dir.stem
+            port = get_port_for_task(competition.id, seed, 0)  # Initial run uses retry_count=0
+
             task = Task(
                 run_id=run_id,
                 seed=seed,
@@ -198,58 +396,234 @@ def main(args):
                 competition=competition,
                 path_to_run_group=run_dir.parent,
                 path_to_run=run_dir,
-                port=base_port + task_index,  # Assign unique port
+                port=port,
+                retry_count=0,  # Initial run
             )
-            tasks.append(task)
-            task_index += 1  # Increment for the next task
+            initial_tasks.append(task)
 
     # Number of workers = number of processes (we will run each worker in a separate process)
-    logger.info(f"Creating {args.n_workers} workers to serve {len(tasks)} tasks...")
-    logger.info(f"Assigning ports from {base_port} to {base_port + len(tasks) - 1}")
+    logger.info(f"Creating {args.n_workers} workers to serve {len(initial_tasks)} tasks...")
+    logger.info(f"Each task can be retried up to {max_retries} times if it fails or hangs")
 
-    # Using multiprocessing Pool to process tasks in parallel
-    with multiprocessing.Pool(processes=args.n_workers) as pool:
-        # Use map_async instead of map for better error handling
-        async_results = pool.map_async(worker_process, tasks)
+    # Safely determine allowed CPU count
+    try:
+        cpu_count = multiprocessing.cpu_count()
+        if args.n_workers > cpu_count:
+            logger.warning(
+                f"Warning: Requested {args.n_workers} workers but only {cpu_count} CPUs available"
+            )
+            logger.warning(f"This may cause performance issues due to CPU contention")
+    except Exception as e:
+        logger.warning(f"Could not determine CPU count: {e}")
 
-        # Wait for all tasks to complete and get results
-        try:
-            results = async_results.get()
-        except Exception as e:
-            logger.error(f"Some tasks failed: {e}")
-            # Get the results that completed successfully
-            results = []
-            for i, task in enumerate(tasks):
-                try:
-                    result = async_results.get(i)
-                    results.append(result)
-                except Exception as task_e:
-                    logger.error(f"Task {task.run_id} failed: {task_e}")
-                    # Add a failed result for this task
-                    results.append(
-                        (
-                            task.run_id,
-                            {
-                                "success": False,
-                                "error": {
-                                    "type": type(task_e).__name__,
-                                    "message": str(task_e),
-                                    "stack_trace": traceback.format_exc(),
-                                },
-                            },
-                        )
-                    )
+    # Log system memory information before starting tasks
+    try:
+        memory_info = psutil.virtual_memory()
+        logger.info(
+            f"System memory: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
+        )
+    except Exception as e:
+        logger.warning(f"Could not determine system memory: {e}")
 
-    # Collect the results and handle output
+    # Initialize an atomic counter for active workers
+    # This helps us track how many workers are currently running
+    manager = multiprocessing.Manager()
+    active_workers = manager.Value("i", 0)
+    task_queue = manager.Queue()
+    result_queue = manager.Queue()
+
+    # Put initial tasks in the queue
+    for task in initial_tasks:
+        task_queue.put(task)
+
+    # Initialize results tracking
     tasks_outputs = {}
-    for run_id, task_output in results:
-        tasks_outputs[run_id] = task_output
+    retry_counts = defaultdict(int)
+
+    # Define a worker function that pulls tasks from the queue
+    def queue_worker(task_queue, result_queue, active_workers):
+        # Set up signal handling
+        init_worker()
+
+        while True:
+            try:
+                # Try to get a task, wait for 1 second if queue is empty
+                try:
+                    task = task_queue.get(timeout=1)
+                except Exception:
+                    # If queue is empty and we've been waiting, check if we should exit
+                    if task_queue.empty() and active_workers.value <= 0:
+                        # No more tasks and no active workers, time to exit
+                        break
+                    continue
+
+                # Increment active worker count
+                with active_workers.get_lock():
+                    active_workers.value += 1
+
+                try:
+                    # Process the task
+                    result = worker_process(task)
+                    # Put result in result queue
+                    result_queue.put(result)
+                except Exception as e:
+                    # If worker_process itself fails (should be rare), log and continue
+                    logger.error(f"Worker process raised unhandled exception: {e}")
+                    logger.error(traceback.format_exc())
+                    # Put a failure result in the queue
+                    error_result = (
+                        task.run_id,
+                        {
+                            "success": False,
+                            "error": {
+                                "type": type(e).__name__,
+                                "message": str(e),
+                                "stack_trace": traceback.format_exc(),
+                                "retry_suggested": True,  # Always retry framework-level errors
+                            },
+                            "retry_count": task.retry_count,
+                        },
+                    )
+                    result_queue.put(error_result)
+                finally:
+                    # Decrement active worker count
+                    with active_workers.get_lock():
+                        active_workers.value -= 1
+
+            except KeyboardInterrupt:
+                # Handle interrupt
+                logger.warning("Worker received keyboard interrupt, exiting...")
+                break
+
+    # Create worker processes
+    processes = []
+    try:
+        # Use 'spawn' method for better process isolation and stability
+        mp_context = multiprocessing.get_context("spawn")
+
+        # Start worker processes
+        for i in range(args.n_workers):
+            p = mp_context.Process(
+                target=queue_worker, args=(task_queue, result_queue, active_workers)
+            )
+            p.daemon = True  # Set as daemon so they exit when main process exits
+            p.start()
+            processes.append(p)
+            logger.info(f"Started worker process {i+1}/{args.n_workers} with PID {p.pid}")
+
+        # Process results as they come in, and handle retries
+        completed_tasks = 0
+        total_tasks = len(initial_tasks)
+
+        while completed_tasks < total_tasks:
+            try:
+                # Get result with a timeout to allow checking for keyboard interrupts
+                try:
+                    run_id, task_output = result_queue.get(timeout=5)
+                except Exception:
+                    # Check if any workers are still alive
+                    if all(not p.is_alive() for p in processes) and result_queue.empty():
+                        logger.error("All worker processes died unexpectedly")
+                        break
+                    continue
+
+                # Process the result
+                tasks_outputs[run_id] = task_output
+
+                # Check if task succeeded
+                if task_output.get("success", False):
+                    logger.info(f"Task {run_id} completed successfully")
+                    completed_tasks += 1
+                else:
+                    # Get error details
+                    error = task_output.get("error", {})
+                    retry_suggested = error.get("retry_suggested", False)
+                    retry_count = task_output.get("retry_count", 0)
+
+                    # Check if we should retry
+                    if retry_suggested and retry_count < max_retries:
+                        # Create a new task with incremented retry count
+                        for task in initial_tasks:
+                            if task.run_id == run_id:
+                                # Get new port for the retry
+                                new_port = get_port_for_task(
+                                    task.competition.id, task.seed, retry_count + 1
+                                )
+
+                                # Create retry task
+                                retry_task = Task(
+                                    run_id=task.run_id,
+                                    seed=task.seed,
+                                    agent=task.agent,
+                                    competition=task.competition,
+                                    path_to_run_group=task.path_to_run_group,
+                                    path_to_run=task.path_to_run,
+                                    port=new_port,
+                                    retry_count=retry_count + 1,
+                                )
+
+                                # Add jitter to avoid all retries starting at once
+                                jitter = random.uniform(2, 10)
+                                logger.info(
+                                    f"Will retry task {run_id} in {jitter:.1f} seconds (attempt {retry_count + 1}/{max_retries})"
+                                )
+                                time.sleep(jitter)
+
+                                # Put retry task in queue
+                                task_queue.put(retry_task)
+                                retry_counts[run_id] += 1
+                                break
+                    else:
+                        if not retry_suggested:
+                            logger.info(f"Task {run_id} failed, but retry not suggested")
+                        elif retry_count >= max_retries:
+                            logger.warning(
+                                f"Task {run_id} failed after {retry_count} retries, giving up"
+                            )
+
+                        # Mark as completed even though it failed
+                        completed_tasks += 1
+
+                # Log progress
+                logger.info(f"Progress: {completed_tasks}/{total_tasks} tasks completed")
+
+            except KeyboardInterrupt:
+                logger.critical("Main process received keyboard interrupt, terminating workers...")
+                break
+
+        # Signal workers to exit by closing the queue
+        task_queue.close()
+
+    except Exception as e:
+        logger.critical(f"Error in main process: {e}")
+        logger.critical(traceback.format_exc())
+    finally:
+        # Clean up processes
+        for p in processes:
+            if p.is_alive():
+                logger.info(f"Terminating worker process {p.pid}")
+                p.terminate()
+                time.sleep(0.5)
+                if p.is_alive():
+                    logger.warning(f"Killing worker process {p.pid}")
+                    p.kill()
+
+        # Wait for processes to exit
+        for p in processes:
+            p.join(timeout=5)
+
+    # Print retry statistics
+    if retry_counts:
+        logger.info("Retry statistics:")
+        for run_id, count in retry_counts.items():
+            logger.info(f"  {run_id}: {count} retries")
 
     # Generate metadata.json
     metadata = {
         "run_group": run_group,
         "created_at": get_timestamp(),
         "runs": tasks_outputs,
+        "retry_counts": dict(retry_counts),
     }
 
     run_group_dir = get_runs_dir() / run_group
@@ -258,8 +632,9 @@ def main(args):
 
     # Log summary of results
     successful_runs = sum(1 for output in tasks_outputs.values() if output.get("success", False))
-    failed_runs = len(tasks_outputs) - successful_runs
+    failed_runs = len(initial_tasks) - successful_runs
     logger.info(f"Run group completed: {successful_runs} successful, {failed_runs} failed")
+    logger.info(f"Total retries: {sum(retry_counts.values())}")
 
 
 if __name__ == "__main__":
@@ -292,10 +667,24 @@ if __name__ == "__main__":
         help="Number of seeds to run for each competition",
     )
     parser.add_argument(
+        "--max-retries",
+        type=int,
+        required=False,
+        default=3,
+        help="Maximum number of retries for failed or hanging tasks",
+    )
+    parser.add_argument(
+        "--base-port",
+        type=int,
+        required=False,
+        default=5000,
+        help="Base port number to use for grading servers",
+    )
+    parser.add_argument(
         "--enable-checkpoints",
         action="store_true",
         help="Enable automatic checkpointing of runs directory",
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--checkpoint-interval",
@@ -327,4 +716,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger = get_logger(__name__)
 
-    main(args)
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        logger.critical("Program interrupted by user. Exiting...")
+        sys.exit(1)
+    except Exception as e:
+        logger.critical(f"Fatal error: {e}")
+        logger.critical(traceback.format_exc())
+        sys.exit(1)

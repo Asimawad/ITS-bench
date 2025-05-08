@@ -29,8 +29,8 @@ python -c "import tensorflow as tf; print('GPUs Available: ', tf.config.list_phy
 # convert $TIME_LIMIT_SECS to more readable format for prompt
 format_time() {
   local time_in_sec=$1
-  local hours=$((time_in_sec / 3600))
-  local minutes=$(((time_in_sec % 3600) / 60))
+  local hours=$((time_in_sec / 7200))
+  local minutes=$(((time_in_sec % 7200) / 60))
   local seconds=$((time_in_sec % 60))
   echo "${hours}hrs ${minutes}mins ${seconds}secs"
 }

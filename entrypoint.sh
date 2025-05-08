@@ -51,7 +51,7 @@ while true; do
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] vLLM server is healthy after $elapsed seconds."
         break
     fi
-    
+
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] vLLM server is not healthy yet, elapsed time: $elapsed seconds..."
     sleep 1
 done
