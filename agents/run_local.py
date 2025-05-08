@@ -115,6 +115,7 @@ def run_locally(
     seed: int = 0,
     heartbeat_callback: Optional[Callable] = None,
     no_output_timeout_mins: int = 15,  # Kill after 15 minutes of no output (configurable)
+    quiet_mode: bool = False,  # Whether to reduce logging verbosity
 ) -> Path:
     """
     Execute `agent` on `competition` locally.
@@ -134,6 +135,7 @@ def run_locally(
         seed: The seed number for this run.
         heartbeat_callback: Optional callback function to call periodically during long operations.
         no_output_timeout_mins: Kill agent if no output for this many minutes (default 15).
+        quiet_mode: Whether to reduce logging verbosity.
 
     Returns:
         Path to the run_dir.
@@ -200,6 +202,8 @@ def run_locally(
 
     # Log system resource usage
     def log_resource_usage(prefix=""):
+        if quiet_mode:
+            return  # Skip resource logging in quiet mode
         try:
             mem = psutil.virtual_memory()
             cpu = psutil.cpu_percent(interval=0.1)
@@ -214,16 +218,18 @@ def run_locally(
     logger.info(
         f"Starting local execution for competition {competition.id} with agent {agent.name} (seed {seed}) [PID:{process_id}]"
     )
-    logger.info(f"Run directory: {run_dir}")
-    logger.info(f"Port assigned: {port}")
-    logger.info(f"No-output timeout set to {no_output_timeout_mins} minutes")
-    log_resource_usage("Initial resources:")
+    if not quiet_mode:
+        logger.info(f"Run directory: {run_dir}")
+        logger.info(f"Port assigned: {port}")
+        logger.info(f"No-output timeout set to {no_output_timeout_mins} minutes")
+        log_resource_usage("Initial resources:")
 
     work = run_dir.resolve()
     work.mkdir(parents=True, exist_ok=True)
 
     # --- 1. Setup Simulated Environment Directories ---
-    logger.info("Setting up simulated environment directories...")
+    if not quiet_mode:
+        logger.info("Setting up simulated environment directories...")
     ch = work / "home"
     ch.mkdir(parents=True, exist_ok=True)
 
@@ -231,12 +237,14 @@ def run_locally(
     for dir_name in ["submission", "logs", "code", "agent", "workspaces", "data"]:
         dir_path = ch / dir_name
         dir_path.mkdir(exist_ok=True)
-        logger.debug(f"Created directory: {dir_path}")
+        if not quiet_mode:
+            logger.debug(f"Created directory: {dir_path}")
 
     # Simulate the /private/data mount point
     simulated_private_data_root = work / "private"
     simulated_private_data_root.mkdir(parents=True, exist_ok=True)
-    logger.debug(f"Created private data root: {simulated_private_data_root}")
+    if not quiet_mode:
+        logger.debug(f"Created private data root: {simulated_private_data_root}")
     check_heartbeat()
 
     # --- 2. Copy Competition Data ---
@@ -251,13 +259,15 @@ def run_locally(
         public_dir_size = sum(
             f.stat().st_size for f in competition.public_dir.glob("**/*") if f.is_file()
         )
-        logger.info(f"Public data size: {public_dir_size / (1024*1024):.2f} MB")
+        if not quiet_mode:
+            logger.info(f"Public data size: {public_dir_size / (1024*1024):.2f} MB")
 
         # Do the actual copy
         shutil.copytree(competition.public_dir, simulated_public_data_dest, dirs_exist_ok=True)
 
         copy_time = time.monotonic() - copy_start_time
-        logger.info(f"Public data copy completed in {copy_time:.2f} seconds")
+        if not quiet_mode:
+            logger.info(f"Public data copy completed in {copy_time:.2f} seconds")
     except Exception as e:
         logger.error(f"Error copying public data: {e}")
         logger.error(traceback.format_exc())
@@ -280,13 +290,15 @@ def run_locally(
             private_dir_size = sum(
                 f.stat().st_size for f in competition.private_dir.glob("**/*") if f.is_file()
             )
-            logger.info(f"Private data size: {private_dir_size / (1024*1024):.2f} MB")
+            if not quiet_mode:
+                logger.info(f"Private data size: {private_dir_size / (1024*1024):.2f} MB")
 
             # Do the actual copy
             shutil.copytree(competition.private_dir, private_target_simulated, dirs_exist_ok=True)
 
             private_copy_time = time.monotonic() - private_copy_start
-            logger.info(f"Private data copy completed in {private_copy_time:.2f} seconds")
+            if not quiet_mode:
+                logger.info(f"Private data copy completed in {private_copy_time:.2f} seconds")
         except Exception as e:
             logger.error(f"Error copying private data: {e}")
             logger.error(traceback.format_exc())
@@ -295,14 +307,17 @@ def run_locally(
         logger.warning(f"Private data directory not found: {competition.private_dir}")
 
     check_heartbeat()
-    log_resource_usage("Resources after data copy:")
+    if not quiet_mode:
+        log_resource_usage("Resources after data copy:")
 
     # --- 3. Generate AIDE Command-Line Arguments from Config and Agent Kwargs ---
-    logger.info("Generating AIDE command-line arguments...")
+    if not quiet_mode:
+        logger.info("Generating AIDE command-line arguments...")
     aide_config_dict = {}
     try:
         aide_config_dict = DEFAULT_AIDE_CONFIG.copy()
-        logger.debug("Successfully loaded default AIDE config")
+        if not quiet_mode:
+            logger.debug("Successfully loaded default AIDE config")
     except Exception as e:
         logger.error(f"Error copying default AIDE config: {e}")
         logger.debug(traceback.format_exc())
@@ -340,7 +355,8 @@ def run_locally(
             )
 
         final_aide_args = aide_cli_args + agent_override_args
-        logger.debug(f"Final AIDE args: {final_aide_args}")
+        if not quiet_mode:
+            logger.debug(f"Final AIDE args: {final_aide_args}")
         check_heartbeat()
 
         # --- 6. Environment Variables Setup ---
@@ -392,9 +408,10 @@ def run_locally(
             server_script = repo_root_server / "environment" / "grading_server.py"
             assert server_script.exists(), f"Server script missing: {server_script}"
 
-            logger.debug(
-                f"Running server: {sys.executable} {server_script} --port {port} from CWD {work}"
-            )
+            if not quiet_mode:
+                logger.debug(
+                    f"Running server: {sys.executable} {server_script} --port {port} from CWD {work}"
+                )
             server = subprocess.Popen(
                 [sys.executable, str(server_script), "--port", str(port)],
                 cwd=work,
@@ -408,7 +425,8 @@ def run_locally(
             if server and server.pid:
                 # Add server to tracked processes
                 child_processes.append(server.pid)
-                logger.info(f"Grading server started with PID: {server.pid}")
+                if not quiet_mode:
+                    logger.info(f"Grading server started with PID: {server.pid}")
 
             ready = False
             logger.info(f"Waiting for server on port {port}...")
@@ -440,7 +458,8 @@ def run_locally(
                 except ConnectionRefusedError:
                     pass
                 except Exception as e_conn:
-                    logger.debug(f"Server check failed on port {port}: {e_conn}. Retrying...")
+                    if not quiet_mode:
+                        logger.debug(f"Server check failed on port {port}: {e_conn}. Retrying...")
 
                 # Exit loop if server is ready
                 if ready:
@@ -457,16 +476,18 @@ def run_locally(
                 )
             logger.info(purple(f"Grading server on port {port} is ready."))
             check_heartbeat()
-            log_resource_usage("Resources after server start:")
+            if not quiet_mode:
+                log_resource_usage("Resources after server start:")
 
             # --- 8. Run Agent Start Script ---
             agent_src_dir = agent.agents_dir / agent.name
             start_script_name = "start.sh"
             start_script_src = agent_src_dir / start_script_name
             start_script_dest = ch / "agent" / start_script_name
-            logger.info(
-                f"Copying agent start script from {start_script_src} to {start_script_dest}"
-            )
+            if not quiet_mode:
+                logger.info(
+                    f"Copying agent start script from {start_script_src} to {start_script_dest}"
+                )
             shutil.copy(start_script_src, start_script_dest)
 
             if not start_script_dest.exists():
@@ -478,11 +499,15 @@ def run_locally(
             os.chmod(start_script_dest, 0o755)
 
             logger.info(purple("Running agent start.sh ..."))
-            logger.debug(f"Running bash {start_script_dest} with CWD {ch}. Args: {final_aide_args}")
+            if not quiet_mode:
+                logger.debug(
+                    f"Running bash {start_script_dest} with CWD {ch}. Args: {final_aide_args}"
+                )
             agent_timeout = int(env.get("TIME_LIMIT_SECS", 7200))
 
             # Log timeout and start time
-            logger.info(f"Agent timeout set to {agent_timeout} seconds")
+            if not quiet_mode:
+                logger.info(f"Agent timeout set to {agent_timeout} seconds")
             agent_start_time = time.monotonic()
 
             # Create a file to record start time for debugging
@@ -509,7 +534,8 @@ def run_locally(
                     # Add to tracked processes
                     child_processes.append(agent_process.pid)
 
-                    logger.info(f"Agent process started with PID: {agent_process.pid}")
+                    if not quiet_mode:
+                        logger.info(f"Agent process started with PID: {agent_process.pid}")
 
                     # Set up non-blocking I/O for stdout and stderr
                     import fcntl
@@ -562,7 +588,7 @@ def run_locally(
                             last_heartbeat_time = current_time
 
                             # Check for no output warning (but not killing yet)
-                            if output_silence_time > no_output_warning_threshold:
+                            if output_silence_time > no_output_warning_threshold and not quiet_mode:
                                 silence_mins = output_silence_time / 60
                                 logger.warning(
                                     f"No output from agent for {silence_mins:.1f} minutes (will kill at {no_output_timeout_mins})"
@@ -579,7 +605,10 @@ def run_locally(
                             if output:
                                 last_output_time = current_time
                                 stdout_data += output
-                                logger.info(output.strip())
+                                # Only log agent output to console if not in quiet mode
+                                if not quiet_mode:
+                                    logger.info(output.strip())
+                                # Always write to log file
                                 agent_log_file.write(output)
                                 agent_log_file.flush()
 
@@ -588,6 +617,7 @@ def run_locally(
                             if output:
                                 last_output_time = current_time
                                 stderr_data += output
+                                # Always log stderr (it's usually important even in quiet mode)
                                 logger.warning(output.strip())
                                 agent_log_file.write(f"STDERR: {output}")
                                 agent_log_file.flush()
@@ -596,7 +626,8 @@ def run_locally(
                     remaining_stdout = agent_process.stdout.read()
                     if remaining_stdout:
                         stdout_data += remaining_stdout
-                        logger.info(remaining_stdout.strip())
+                        if not quiet_mode:
+                            logger.info(remaining_stdout.strip())
                         agent_log_file.write(remaining_stdout)
 
                     remaining_stderr = agent_process.stderr.read()
@@ -607,7 +638,8 @@ def run_locally(
 
                 # Check return code
                 return_code = agent_process.returncode
-                logger.info(f"Agent process completed with return code: {return_code}")
+                if not quiet_mode:
+                    logger.info(f"Agent process completed with return code: {return_code}")
 
                 if return_code != 0:
                     if return_code == 124:  # Timeout error code from `timeout` utility
@@ -636,7 +668,8 @@ def run_locally(
                 )
 
             check_heartbeat()
-            log_resource_usage("Resources after agent completion:")
+            if not quiet_mode:
+                log_resource_usage("Resources after agent completion:")
 
             # --- CREATE/FIX SYMLINKS POST-AGENT-RUN ---
             logger.info("Creating/Fixing symlinks for submission files post-agent-run...")
@@ -655,7 +688,8 @@ def run_locally(
 
                         if submission_link.exists():
                             if submission_link.is_symlink():
-                                logger.debug(f"Removing existing symlink: {submission_link}")
+                                if not quiet_mode:
+                                    logger.debug(f"Removing existing symlink: {submission_link}")
                                 submission_link.unlink()
                             else:
                                 logger.warning(
@@ -705,7 +739,10 @@ def run_locally(
                         except Exception as e_save:
                             logger.error(f"Error saving '{name}': {e_save}")
                     else:
-                        logger.debug(f"Source for '{name}' not found: '{src_path}'. Skipping save.")
+                        if not quiet_mode:
+                            logger.debug(
+                                f"Source for '{name}' not found: '{src_path}'. Skipping save."
+                            )
 
             # This is the one place we return, so include the timing code here
             logger.info(purple("Run completed."))
@@ -777,15 +814,17 @@ def run_locally(
             if (
                 ch.exists() and ch.is_relative_to(work) and (work / ch.name).exists()
             ):  # Check if ch itself is still there (e.g. if retain_workspace=True previously)
-                logger.debug(f"Removing simulated home directory contents: {ch}")
+                if not quiet_mode:
+                    logger.debug(f"Removing simulated home directory contents: {ch}")
 
                 # Remove the simulated '/home' directory structure if it's still under `work`
                 # This path was work / "home"
                 simulated_home_to_remove = work / "home"
                 if simulated_home_to_remove.exists():
-                    logger.debug(
-                        f"Removing full simulated home directory: {simulated_home_to_remove}"
-                    )
+                    if not quiet_mode:
+                        logger.debug(
+                            f"Removing full simulated home directory: {simulated_home_to_remove}"
+                        )
                     try:
                         shutil.rmtree(simulated_home_to_remove)
                     except Exception as e_rm_home:
@@ -795,7 +834,10 @@ def run_locally(
 
             # Remove simulated '/private'
             if simulated_private_data_root.exists():
-                logger.debug(f"Removing simulated private data root: {simulated_private_data_root}")
+                if not quiet_mode:
+                    logger.debug(
+                        f"Removing simulated private data root: {simulated_private_data_root}"
+                    )
                 try:
                     shutil.rmtree(simulated_private_data_root)
                 except Exception as e_rm_private:

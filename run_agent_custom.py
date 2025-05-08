@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import json
 import logging
@@ -20,20 +22,38 @@ from agents.registry import registry as agent_registry
 from agents.run_local import run_locally
 from environment.upload_results import upload_to_s3
 from environment.utils_zip import make_filtered_zip
-
-# from agents.run import run_in_container, run_locally
-from mlebench.data import is_dataset_prepared
 from mlebench.registry import Competition, registry
 from mlebench.utils import create_run_dir, get_logger, get_runs_dir, get_timestamp, purple
 
-logger = get_logger(__name__)
+# Global flag for quiet mode
+QUIET_MODE = False
 
-# Create a handler that logs to stdout for immediate feedback during parallel execution
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setFormatter(
-    logging.Formatter("%(asctime)s [%(process)d] %(levelname)s %(name)s - %(message)s")
-)
-logging.getLogger().addHandler(stdout_handler)
+# Custom logger initialization
+def setup_logging(quiet_mode=False):
+    global QUIET_MODE
+    QUIET_MODE = quiet_mode
+
+    root_logger = logging.getLogger()
+    # Clear existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Set appropriate level based on quiet mode
+    log_level = logging.WARNING if quiet_mode else logging.INFO
+    root_logger.setLevel(log_level)
+
+    # Create a handler that logs to stdout
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter("%(asctime)s [%(process)d] %(levelname)s %(name)s - %(message)s")
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.setLevel(log_level)
+    root_logger.addHandler(stdout_handler)
+
+    return get_logger(__name__)
+
+
+# Initialize with default (will be updated in main)
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -71,6 +91,7 @@ def worker_process(task: Task):
 
     # Create and configure run-specific logger
     run_logger = get_logger(f"{task.run_id}_{process_id}")
+    # Always log to file at INFO level, regardless of quiet mode
     run_logger.setLevel(logging.INFO)
 
     # Create log directory if it doesn't exist
@@ -86,35 +107,41 @@ def worker_process(task: Task):
         except Exception as e:
             run_logger.warning(f"Failed to rename previous log file: {e}")
 
-    # Add file handler
+    # Add file handler - always at INFO level for complete logs
     file_handler = logging.FileHandler(log_file_path)
     file_formatter = logging.Formatter("%(asctime)s [PID:%(process)d] %(levelname)s - %(message)s")
     file_handler.setFormatter(file_formatter)
+    file_handler.setLevel(logging.INFO)  # Always INFO for file logs
     run_logger.addHandler(file_handler)
 
-    # Also add a stream handler to see logs in real-time
+    # Add stream handler with level dependent on quiet mode
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(file_formatter)
+    stream_handler.setLevel(logging.WARNING if QUIET_MODE else logging.INFO)
     run_logger.addHandler(stream_handler)
 
     # Prevent propagation to avoid duplicate logs
     run_logger.propagate = False
 
     try:
-        # Log worker start with detailed information
+        # Log worker start with detailed information - minimal logging if in quiet mode
         run_logger.info(f"=== WORKER STARTED [PID:{process_id}] ===")
         if task.retry_count > 0:
-            run_logger.info(f"*** RETRY ATTEMPT #{task.retry_count} ***")
-        run_logger.info(
-            f"Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
-        )
-        run_logger.info(f"Run directory: {task.path_to_run}")
+            # Always show retry information, even in quiet mode
+            run_logger.warning(f"*** RETRY ATTEMPT #{task.retry_count} ***")
 
-        # Log system resource info at start
-        memory_info = psutil.virtual_memory()
-        run_logger.info(
-            f"System memory: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
-        )
+        # More verbose logging only if not in quiet mode
+        if not QUIET_MODE:
+            run_logger.info(
+                f"Competition: {task.competition.id}, Agent: {task.agent.name}, Seed: {task.seed}, Port: {task.port}"
+            )
+            run_logger.info(f"Run directory: {task.path_to_run}")
+
+            # Log system resource info at start
+            memory_info = psutil.virtual_memory()
+            run_logger.info(
+                f"System memory: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
+            )
 
         # Run the task with periodic heartbeats
         def heartbeat_callback():
@@ -123,23 +150,28 @@ def worker_process(task: Task):
             if current_time - last_heartbeat >= heartbeat_interval:
                 last_heartbeat = current_time
                 elapsed_minutes = (current_time - start_time) / 60
-                memory_info = psutil.virtual_memory()
-                cpu_percent = psutil.cpu_percent(interval=0.1)
-                run_logger.info(
-                    f"HEARTBEAT - Task running for {elapsed_minutes:.1f} minutes - CPU: {cpu_percent}%, Mem: {memory_info.percent}%"
-                )
+
+                if not QUIET_MODE:
+                    memory_info = psutil.virtual_memory()
+                    cpu_percent = psutil.cpu_percent(interval=0.1)
+                    run_logger.info(
+                        f"HEARTBEAT - Task running for {elapsed_minutes:.1f} minutes - CPU: {cpu_percent}%, Mem: {memory_info.percent}%"
+                    )
+
                 # Flush logs to ensure they're written
                 for handler in run_logger.handlers:
                     handler.flush()
 
         # Call the run_locally function with heartbeat and enhanced logging
-        run_logger.info(f"Initializing environment for task...")
+        if not QUIET_MODE:
+            run_logger.info(f"Initializing environment for task...")
         heartbeat_callback()  # Initial heartbeat
 
         # Set a more aggressive no-output timeout based on retry count
         # First attempt: 15 minutes, Second: 10 minutes, Third+: 5 minutes
         no_output_timeout = max(5, 15 - (task.retry_count * 5))
-        run_logger.info(f"Setting no-output timeout to {no_output_timeout} minutes")
+        if not QUIET_MODE:
+            run_logger.info(f"Setting no-output timeout to {no_output_timeout} minutes")
 
         # Run the task with custom logger
         run_locally(
@@ -152,6 +184,7 @@ def worker_process(task: Task):
             seed=task.seed,
             heartbeat_callback=heartbeat_callback,  # Pass the heartbeat callback
             no_output_timeout_mins=no_output_timeout,  # Pass configurable timeout
+            quiet_mode=QUIET_MODE,  # Pass the quiet mode flag
         )
 
         # Task completed successfully
@@ -188,18 +221,22 @@ def worker_process(task: Task):
         stack_trace = traceback.format_exc()
         run_logger.error(f"Task failed with error type: {type(e).__name__}")
         run_logger.error(f"Error details: {str(e)}")
-        run_logger.error(f"Stack trace:\n{stack_trace}")
 
-        # Log additional system info for debugging
-        try:
-            memory_info = psutil.virtual_memory()
-            run_logger.error(
-                f"System memory at failure: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
-            )
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            run_logger.error(f"CPU usage at failure: {cpu_percent}%")
-        except Exception as e_info:
-            run_logger.error(f"Failed to get system info: {e_info}")
+        # Only log full stack trace if not in quiet mode
+        if not QUIET_MODE:
+            run_logger.error(f"Stack trace:\n{stack_trace}")
+
+        # Log additional system info for debugging, but only if not in quiet mode
+        if not QUIET_MODE:
+            try:
+                memory_info = psutil.virtual_memory()
+                run_logger.error(
+                    f"System memory at failure: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
+                )
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                run_logger.error(f"CPU usage at failure: {cpu_percent}%")
+            except Exception as e_info:
+                run_logger.error(f"Failed to get system info: {e_info}")
 
         # Determine if this error should be retried
         # Generally retry network, resource, and timeout issues
@@ -351,9 +388,8 @@ def queue_worker(task_queue, result_queue, active_workers):
                     break
                 continue
 
-            # Increment active worker count
-            with active_workers.get_lock():
-                active_workers.value += 1
+            # Increment active worker count - use value property directly without lock
+            active_workers.value += 1
 
             try:
                 # Process the task
@@ -380,9 +416,8 @@ def queue_worker(task_queue, result_queue, active_workers):
                 )
                 result_queue.put(error_result)
             finally:
-                # Decrement active worker count
-                with active_workers.get_lock():
-                    active_workers.value -= 1
+                # Decrement active worker count - use value property directly without lock
+                active_workers.value -= 1
 
         except KeyboardInterrupt:
             # Handle interrupt
@@ -391,8 +426,17 @@ def queue_worker(task_queue, result_queue, active_workers):
 
 
 def main(args):
+    # Initialize logging based on quiet mode
+    global logger
+    logger = setup_logging(args.quiet)
+
+    # Set up a custom data directory that uses lite_dataset
+    lite_data_dir = Path("./lite_dataset")
+    if not lite_data_dir.exists():
+        raise ValueError(f"Lite dataset directory not found: {lite_data_dir.resolve()}")
+
     global registry
-    registry = registry.set_data_dir(Path(args.data_dir))
+    registry = registry.set_data_dir(lite_data_dir)
 
     agent = agent_registry.get_agent(args.agent_id)
 
@@ -405,14 +449,9 @@ def main(args):
     else:
         logger.info("Automatic checkpointing is disabled")
 
-    # Load competition ids and check if all are prepared
+    # Load competition ids from the file
     with open(args.competition_set, "r") as f:
         competition_ids = [line.strip() for line in f.read().splitlines() if line.strip()]
-
-    for competition_id in competition_ids:
-        competition = registry.get_competition(competition_id)
-        if not is_dataset_prepared(competition):
-            raise ValueError(f"Dataset for competition `{competition.id}` is not prepared!")
 
     # Create tasks for each competition and seed
     logger.info(f"Launching run group: {run_group}")
@@ -441,22 +480,46 @@ def main(args):
     # Create initial task list
     for seed in range(args.n_seeds):
         for competition_id in competition_ids:
-            competition = registry.get_competition(competition_id)
-            run_dir = create_run_dir(competition.id, agent.id, run_group, seed)
-            run_id = run_dir.stem
-            port = get_port_for_task(competition.id, seed, 0)  # Initial run uses retry_count=0
+            try:
+                # Get competition from registry
+                competition = registry.get_competition(competition_id)
 
-            task = Task(
-                run_id=run_id,
-                seed=seed,
-                agent=agent,
-                competition=competition,
-                path_to_run_group=run_dir.parent,
-                path_to_run=run_dir,
-                port=port,
-                retry_count=0,  # Initial run
-            )
-            initial_tasks.append(task)
+                # Create a run directory for this task
+                run_dir = create_run_dir(competition.id, agent.id, run_group, seed)
+                run_id = run_dir.stem
+                port = get_port_for_task(competition.id, seed, 0)  # Initial run uses retry_count=0
+
+                # Override the public and private dirs with our lite dataset paths
+                competition_path = lite_data_dir / competition.id / "prepared"
+
+                # If the directory structure doesn't exist as expected, skip this competition
+                if not competition_path.exists():
+                    logger.warning(
+                        f"Skipping competition {competition_id} - directory not found: {competition_path}"
+                    )
+                    continue
+
+                # Create a task for this competition and seed
+                task = Task(
+                    run_id=run_id,
+                    seed=seed,
+                    agent=agent,
+                    competition=competition,
+                    path_to_run_group=run_dir.parent,
+                    path_to_run=run_dir,
+                    port=port,
+                    retry_count=0,  # Initial run
+                )
+                initial_tasks.append(task)
+                logger.info(f"Added task for competition {competition_id}, seed {seed}")
+            except Exception as e:
+                logger.error(f"Failed to create task for competition {competition_id}: {e}")
+                if not QUIET_MODE:
+                    traceback.print_exc()
+
+    if not initial_tasks:
+        logger.error("No valid tasks found. Exiting.")
+        return
 
     # Number of workers = number of processes (we will run each worker in a separate process)
     logger.info(f"Creating {args.n_workers} workers to serve {len(initial_tasks)} tasks...")
@@ -474,13 +537,14 @@ def main(args):
         logger.warning(f"Could not determine CPU count: {e}")
 
     # Log system memory information before starting tasks
-    try:
-        memory_info = psutil.virtual_memory()
-        logger.info(
-            f"System memory: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
-        )
-    except Exception as e:
-        logger.warning(f"Could not determine system memory: {e}")
+    if not QUIET_MODE:
+        try:
+            memory_info = psutil.virtual_memory()
+            logger.info(
+                f"System memory: {memory_info.percent}% used, {memory_info.available / (1024**3):.2f} GB available"
+            )
+        except Exception as e:
+            logger.warning(f"Could not determine system memory: {e}")
 
     # Initialize an atomic counter for active workers
     # This helps us track how many workers are currently running
@@ -593,12 +657,13 @@ def main(args):
                 logger.critical("Main process received keyboard interrupt, terminating workers...")
                 break
 
-        # Signal workers to exit by closing the queue
-        task_queue.close()
+        # Signal workers to exit - removed task_queue.close() since manager.Queue doesn't have that method
+        # Instead, we rely on the queue_worker loop to exit when task_queue is empty and active_workers is 0
 
     except Exception as e:
         logger.critical(f"Error in main process: {e}")
-        logger.critical(traceback.format_exc())
+        if not QUIET_MODE:
+            logger.critical(traceback.format_exc())
     finally:
         # Clean up processes
         for p in processes:
@@ -615,7 +680,7 @@ def main(args):
             p.join(timeout=5)
 
     # Print retry statistics
-    if retry_counts:
+    if retry_counts and not QUIET_MODE:
         logger.info("Retry statistics:")
         for run_id, count in retry_counts.items():
             logger.info(f"  {run_id}: {count} retries")
@@ -636,7 +701,7 @@ def main(args):
     successful_runs = sum(1 for output in tasks_outputs.values() if output.get("success", False))
     failed_runs = len(initial_tasks) - successful_runs
     logger.info(f"Run group completed: {successful_runs} successful, {failed_runs} failed")
-    logger.info(f"Total retries: {sum(retry_counts.values())}")
+    logger.info(f"Total spookyretries: {sum(retry_counts.values())}")
 
 
 if __name__ == "__main__":
@@ -709,11 +774,11 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
-        "--data-dir",
-        help="Path to the directory containing the competition data.",
-        type=str,
+        "--quiet",
+        help="Reduce logging verbosity to show only warnings and errors",
+        action="store_true",
         required=False,
-        default=registry.get_data_dir(),
+        default=False,
     )
     args = parser.parse_args()
     logger = get_logger(__name__)
@@ -725,5 +790,6 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         logger.critical(f"Fatal error: {e}")
-        logger.critical(traceback.format_exc())
+        if not args.quiet:
+            logger.critical(traceback.format_exc())
         sys.exit(1)
