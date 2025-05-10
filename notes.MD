@@ -382,7 +382,7 @@ Create a JSONL file that maps submissions to their respective competitions. The 
 
 3. Run the Evaluation
 ```bash
-mlebench grade --submission submission_paths.jsonl --output-dir evaluation_results
+mlebench grade --submission gpt-4-turbo_data_None_25_steps/submission_paths_seed_all.jsonl --output-dir evaluation_results
 ```
 
 4. To Evaluate individual competitions 
@@ -475,3 +475,6 @@ python scripts/aggregate_competition_metrics.py --seed all
 mlebench grade --submission runs/2025-05-07T13-09-10-GMT_run-group_aide-deepseek/submission_paths_seed_all.jsonl  --output-dir output --data-dir lite_dataset 
 
 python scripts/generate_submission_paths.py --seeds all
+
+
+mlebench grade --submission gpt-4-turbo_data_None_25_steps/submission_paths_seed_all.jsonl --output-dir evaluation_results --data-dir lite_dataset/

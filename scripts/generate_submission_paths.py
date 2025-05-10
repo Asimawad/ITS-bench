@@ -20,13 +20,23 @@ def find_submission_paths(run_dir: Path, seed, all_seeds=False) -> list:
             print(f"Competition ID: {competition_id} seed: {seed}")
 
             # Look for submission.csv only in the logs directory
-            logs_dir = comp_dir / "logs"
+            logs_dir = comp_dir
             if logs_dir.exists():
 
-                # Look for submission.csv in the subdirectory pattern
-                for subdir in logs_dir.iterdir():
-                    if subdir.is_dir():
-                        submission_file = subdir / "submission.csv"
+                submission_file = logs_dir / "submission.csv"
+
+                if submission_file:
+                    paths.append(
+                        {
+                            "competition_id": competition_id,
+                            "submission_path": str(submission_file.relative_to(run_dir)),
+                        }
+                    )
+                if not submission_file:
+                    # Look for submission.csv in the subdirectory pattern
+                    for subdir in logs_dir.iterdir():
+                        if subdir.is_dir():
+                            submission_file = subdir / "submission.csv"
 
                         if submission_file:
                             paths.append(
@@ -100,3 +110,7 @@ if __name__ == "__main__":
     main()
 # python scripts/generate_submission_paths.py
 # python scripts/generate_submission_paths.py --run runs/2025-05-06T15-35-57-GMT_run-group_aide-deepseek
+# python scripts/generate_submission_paths.py --run gpt-4-turbo_data_None_25_steps --seeds 0 1 2
+# python scripts/generate_submission_paths.py --run gpt-4o_data_None_25_steps --seeds 0 1 2
+# python scripts/generate_submission_paths.py --run RedHatAI_DeepSeek-R1-Distill-Qwen-14B-FP8-dynamic_data_None_25_steps
+# python scripts/generate_submission_paths.py --run RedHatAI_DeepSeek-R1-Distill-Qwen-14B-FP8-dynamic_data_None_25_steps --seeds all
