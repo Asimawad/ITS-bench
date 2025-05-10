@@ -20,6 +20,7 @@ cache/
 __pycache__/
 *.py[cod]
 *$py.class
+agents/aide-ds/
 # .gitignore
 *.pyc
 lite_dataset/
