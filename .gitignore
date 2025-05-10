@@ -23,6 +23,7 @@ __pycache__/
 # .gitignore
 *.pyc
 lite_dataset/
+agents/aide-ds
 notes.md
 # C extensions
 *.so
