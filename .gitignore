@@ -18,6 +18,7 @@ cache/
 ./aide-ds/
 # Byte-compiled / optimized / DLL files
 __pycache__/
+mle-bench-main/
 *.py[cod]
 *$py.class
 # .gitignore
