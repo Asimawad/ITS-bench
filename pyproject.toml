@@ -39,7 +39,6 @@ dependencies = [
   "s3fs",
   "pyyaml",
   "tqdm",
-  "psutil==5.9.8"
 ]
 
 [tool.setuptools]
