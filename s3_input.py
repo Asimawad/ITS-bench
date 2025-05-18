@@ -29,3 +29,8 @@ os.makedirs(extract_dir, exist_ok=True)
 with zipfile.ZipFile(local_zip, "r") as z:
     z.extractall(extract_dir)
 print(f"Extracted all files to {extract_dir}")
+
+
+"""
+mlebench grade --submission  o4-mini-2025-04-16_data_Baseline_25_steps/submission_paths_seed_1.jsonl  --output-dir o4-mini-2025-04-16_data_Baseline_25_steps --data-dir lite_dataset
+"""

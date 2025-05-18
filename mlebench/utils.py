@@ -11,12 +11,12 @@ from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-if TYPE_CHECKING:
-    from kaggle.api.kaggle_api_extended import KaggleApi
-
 import pandas as pd
 import py7zr
 import yaml
+
+# if TYPE_CHECKING:
+from kaggle.api.kaggle_api_extended import KaggleApi
 from pandas import DataFrame
 from tqdm.auto import tqdm
 

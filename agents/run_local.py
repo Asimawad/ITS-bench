@@ -862,3 +862,6 @@ def run_locally(
             # within the work/logs and work/workspaces structure if they were moved.
             # If they were not moved (i.e. ch/logs, ch/workspaces are still there),
             # the relative symlinks will work within ch.
+
+
+# mlebench grade --submission  RedHatAI_DeepSeek-R1-Distill-Qwen-7B-FP8-dynamic_data_None_25_steps/submission_paths_seed_all.jsonl  --output-dir RedHatAI_DeepSeek-R1-Distill-Qwen-7B-FP8-dynamic_data_None_25_steps --data-dir lite_dataset

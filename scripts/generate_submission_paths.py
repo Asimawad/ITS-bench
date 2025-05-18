@@ -113,4 +113,4 @@ if __name__ == "__main__":
 # python scripts/generate_submission_paths.py --run gpt-4-turbo_data_None_25_steps --seeds 0 1 2
 # python scripts/generate_submission_paths.py --run gpt-4o_data_None_25_steps --seeds 0 1 2
 # python scripts/generate_submission_paths.py --run RedHatAI_DeepSeek-R1-Distill-Qwen-14B-FP8-dynamic_data_None_25_steps
-# python scripts/generate_submission_paths.py --run RedHatAI_DeepSeek-R1-Distill-Qwen-14B-FP8-dynamic_data_None_25_steps --seeds all
+# python scripts/generate_submission_paths.py --run RedHatAI_DeepSeek-R1-Distill-Qwen-32B-FP8-dynamic_data_self-reflection_25_steps --seeds all
